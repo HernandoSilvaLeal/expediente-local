@@ -19,7 +19,7 @@
 // Uso:
 //   node cli.mjs capturar  --texto "..." [--modelo <ruta>] [--proveedor <clave>]
 //   node cli.mjs revisar   --texto "..." --extraccion salida-del-modelo.json
-//   node cli.mjs ver | csv | verificar | hechos
+//   node cli.mjs ver | csv | constancia | verificar | hechos
 //   node cli.mjs aprobar --oficial "..." --texto "..."  |  rechazar --oficial "..."
 //
 // Opciones comunes:  --expediente EXP-001  --ledger datos/EXP-001.jsonl
@@ -29,7 +29,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 
 import { cargarEsquema } from './core/esquema.mjs'
-import { abrirExpediente, aCsv } from './core/expediente.mjs'
+import { abrirExpediente, aCsv, constancia } from './core/expediente.mjs'
 import { leer as leerLedger } from './core/ledger.mjs'
 import { cargarDominio } from './scripts/cargar-dominio.mjs'
 
@@ -164,6 +164,7 @@ async function ejecutar (cmd) {
     case 'revisar':    return revisar()
     case 'ver':        return ver()
     case 'csv':        return csv()
+    case 'constancia': return imprimirConstancia()
     case 'verificar':  return verificar()
     case 'hechos':     return hechos()
     case 'resolver':   return resolverConflicto()
@@ -236,6 +237,19 @@ function revisar () {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function ver () { pintar(exp.leer()) }
+
+/**
+ * La constancia: lo que un oficial le entrega a su supervisor.
+ *
+ * `csv` es para una máquina; esto es para una persona que tiene que justificar
+ * una decisión ante otra persona. Son dos audiencias y dos formatos, y fundirlos
+ * habría dado algo que no sirve del todo a ninguna.
+ */
+function imprimirConstancia () {
+  const texto = constancia(exp.leer(), esquema)
+  if (op.salida) { writeFileSync(op.salida, texto + '\n'); console.log(`\n  ${V}✓${N} ${op.salida}\n`) }
+  else console.log(texto)
+}
 
 function csv () {
   const salida = aCsv(exp.leer())

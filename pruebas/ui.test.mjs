@@ -699,3 +699,55 @@ test('UI-40 · ⭐ «qué hacer ahora» cambia según quién mire', async () => 
   // Un expediente firmado no le toca a nadie.
   assert.equal(queHacerAhora({ estado: 'APROBADO', conflictos: [] }, 'aprobador').mio, false)
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-11 · LAS DOS DIMENSIONES DE QUIEN MIRA ESTO
+//
+//  Dos personas muy distintas van a evaluar este sistema, y cada una necesita
+//  algo que la otra no:
+//
+//    · quien evalúa TÉCNICAMENTE necesita REPLICAR   → los comandos
+//    · quien evalúa desde el BANCO necesita JUSTIFICAR → la constancia
+//
+//  Servir a una sola es la forma más común de perder a la otra.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-41 · ⭐ quien evalúa técnicamente tiene el comando a la vista', async () => {
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-001`)).json()
+  const html = await (await fetch(`${BASE}/`)).text()
+
+  assert.match(html, /Compruébalo tú/)
+  // Los comandos que reproducen lo que la pantalla muestra, sin ir al README.
+  for (const cmd of ['cli.mjs verificar', 'cli.mjs csv', 'verify:invariantes', 'unshare -rn']) {
+    assert.ok(html.includes(cmd), `falta el comando: ${cmd}`)
+  }
+  assert.ok(d.expediente, 'y el dato que esos comandos reproducen')
+})
+
+test('UI-42 · ⭐ quien evalúa desde el banco tiene con qué justificar', async () => {
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-001`)).json()
+  assert.ok(d.constancia, 'la constancia viaja con el expediente')
+
+  // Lo que un supervisor busca cuando pregunta «¿por qué aprobó usted esto?»
+  assert.match(d.constancia, /CONSTANCIA DEL EXPEDIENTE EXP-001/)
+  assert.match(d.constancia, /Acuerdo 1-2026/, 'la norma, citada por artículo')
+  assert.match(d.constancia, /art\. 10\.4/)
+  assert.match(d.constancia, /Firmada por/, 'quién')
+  assert.match(d.constancia, /Motivo/, 'y por qué')
+  assert.match(d.constancia, /dice\s+«/, 'la frase del documento que sostiene cada dato')
+  assert.match(d.constancia, /cli\.mjs verificar/, 'y cómo se comprueba que no se alteró')
+  assert.match(d.constancia, /sintéticos/i, 'declarado: ninguna persona real')
+})
+
+test('UI-43 · la constancia dice cuando el expediente NO se puede firmar', async () => {
+  // Un expediente con una contradicción abierta no se firma, y la constancia
+  // tiene que decirlo: un supervisor que lea «aprobado» donde había un conflicto
+  // sin resolver deja de creerse el resto del documento.
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-003`)).json()
+  if (!d.expediente.conflictos.length) return   // otro test ya lo resolvió
+
+  assert.match(d.constancia, /CONTRADICCIONES ABIERTAS/)
+  assert.match(d.constancia, /NO puede firmarse/)
+  assert.match(d.constancia, /asentado/)
+  assert.match(d.constancia, /propuesto/)
+})

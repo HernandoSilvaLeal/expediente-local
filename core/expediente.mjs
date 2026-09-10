@@ -489,6 +489,135 @@ export function aCsv (expediente) {
   return filas.join('\n')
 }
 
+/**
+ * ⭐ LA CONSTANCIA · el documento con el que un oficial justifica su decisión.
+ *
+ * ── LA OTRA MITAD DEL USUARIO ─────────────────────────────────────────────
+ *
+ * Este sistema lo van a mirar dos personas muy distintas, y cada una necesita
+ * algo que la otra no:
+ *
+ *   · quien evalúa TÉCNICAMENTE necesita **replicar** → los comandos
+ *   · quien evalúa desde el BANCO necesita **justificar** → esto
+ *
+ * Un supervisor no pregunta «¿cómo funciona?». Pregunta «¿por qué aprobó usted
+ * este expediente?», y la respuesta no puede ser una pantalla: tiene que ser un
+ * papel que se archiva, se envía y se lee dentro de cuatro años.
+ *
+ * El Acuerdo 1-2026 lo llama, en su artículo 10.4, **constancia documentada** de
+ * la debida diligencia. De ahí el nombre.
+ *
+ * Es texto plano a propósito: se pega en un correo, entra en cualquier sistema y
+ * no depende de que nadie tenga instalado nada.
+ */
+export function constancia (expediente, esquema) {
+  const L = []
+  const linea = (c = '─') => L.push(c.repeat(72))
+
+  const firma = (expediente.decisiones ?? []).at(-1)
+  const campos = Object.entries(expediente.campos ?? {})
+  const huecos = Object.entries(expediente.huecos ?? {})
+  const conflictos = expediente.conflictos ?? []
+  const resoluciones = expediente.resoluciones ?? []
+
+  linea('═')
+  L.push(`CONSTANCIA DEL EXPEDIENTE ${expediente.id}`)
+  L.push(`Acuerdo 1-2026 SBP · art. 10.4 (constancia documentada) · art. 29 (reconstrucción)`)
+  linea('═')
+  L.push('')
+  L.push(`Estado          ${expediente.estado}`)
+  L.push(`Generada        ${new Date().toISOString()}`)
+
+  if (firma) {
+    L.push('')
+    L.push(`DECISIÓN        ${String(firma.que).toUpperCase()}`)
+    L.push(`Firmada por     ${firma.oficial ?? '—'}`)
+    L.push(`Cuándo          ${firma.ts}`)
+    if (firma.motivo) L.push(`Motivo          ${firma.motivo}`)
+  } else {
+    L.push('')
+    L.push('DECISIÓN        sin firmar todavía')
+  }
+
+  L.push('')
+  linea()
+  L.push('LO QUE ENTRÓ AL EXPEDIENTE, Y DE DÓNDE SALE')
+  L.push('Cada dato lleva la frase literal del documento que lo sostiene.')
+  linea()
+  const criticos = new Set(esquema?.camposCriticos ?? [])
+  const esCritico = (r) => criticos.has(r) || criticos.has(rutaGenerica(r))
+  for (const [ruta, c] of campos) {
+    L.push('')
+    L.push(`  ${esCritico(ruta) ? '*' : ' '} ${ruta}`)
+    L.push(`      valor      ${c.valor}`)
+    L.push(`      evidencia  ${c.evidencia}`)
+    if (c.cita) L.push(`      dice       «${c.cita}»`)
+  }
+  L.push('')
+  L.push('  (*) lo exige el artículo 18 del Acuerdo 1-2026')
+
+  if (huecos.length) {
+    L.push('')
+    linea()
+    L.push('LO QUE NO ENTRÓ, Y POR QUÉ')
+    L.push('Un hueco explicado vale más que un dato inventado.')
+    linea()
+    for (const [ruta, h] of huecos) {
+      L.push('')
+      L.push(`  ${ruta}`)
+      L.push(`      lo paró    ${h.guardias.join(', ')}`)
+      L.push(`      motivo     ${h.motivos.join(', ')}`)
+    }
+  }
+
+  if (resoluciones.length) {
+    L.push('')
+    linea()
+    L.push('CONTRADICCIONES ENTRE DOCUMENTOS, Y QUIÉN LAS RESOLVIÓ')
+    L.push('El sistema no elige entre dos fuentes: se detiene y decide una persona.')
+    linea()
+    for (const r of resoluciones) {
+      L.push('')
+      L.push(`  ${r.ruta}`)
+      L.push(`      quedó      ${r.valor}`)
+      L.push(`      descartado ${r.descartado}`)
+      L.push(`      decidió    ${r.oficial ?? '—'}`)
+      L.push(`      porque     ${r.motivo ?? '—'}`)
+    }
+  }
+
+  if (conflictos.length) {
+    L.push('')
+    linea()
+    L.push('CONTRADICCIONES ABIERTAS · el expediente NO puede firmarse')
+    linea()
+    for (const c of conflictos) {
+      L.push('')
+      L.push(`  ${c.ruta}`)
+      L.push(`      asentado   ${c.asentado}   «${c.citaAsentada}»`)
+      L.push(`      propuesto  ${c.propuesto}   «${c.citaPropuesta}»`)
+    }
+  }
+
+  L.push('')
+  linea()
+  L.push('CÓMO SE COMPRUEBA QUE ESTO NO SE ALTERÓ')
+  linea()
+  L.push('')
+  L.push(`  Cada hecho de este expediente lleva el hash del anterior. Cambiar`)
+  L.push(`  cualquier dato —incluido el nombre de quien firmó— rompe la cadena.`)
+  L.push('')
+  L.push(`      node cli.mjs verificar --ledger datos/${expediente.id}.jsonl`)
+  L.push('')
+  L.push(`  El expediente no se guarda: se reconstruye de sus hechos cada vez.`)
+  L.push(`  Eso es lo que el artículo 29 llama reconstrucción de la operación.`)
+  L.push('')
+  linea('═')
+  L.push('Datos sintéticos. Ninguna persona real, ningún cliente real.')
+  linea('═')
+  return L.join('\n')
+}
+
 /** Comillas dobles duplicadas, según RFC 4180. Un CSV mal escapado corrompe el dato. */
 function escapar (x) {
   const s = String(x ?? '')

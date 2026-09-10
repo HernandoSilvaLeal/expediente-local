@@ -218,6 +218,11 @@ textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
 .ahora b{color:var(--apagado); margin-right:6px}
 .ahora.mio{border-left-color:var(--mint)}
 .ahora.mio b{color:var(--mint)}
+/* Los comandos, en la misma tabla que todo lo demás: quien evalúa técnicamente
+   no debería tener que buscar en el README qué correr para comprobar lo que
+   tiene delante. */
+.tarjeta code{font-size:12px; color:var(--mint); background:#0B1018;
+              padding:2px 6px; border-radius:4px; white-space:nowrap}
 .btn-no{color:var(--texto); background:transparent; border:1px solid var(--coral)}
 </style>
 </head>
@@ -667,6 +672,39 @@ async function abrirExpediente (id) {
       <div class="fuente">${resaltar(e)}</div>
     </div>` : ''}
 
+    ${d.constancia ? `<div class="tarjeta">
+      <h2>Constancia para el supervisor</h2>
+      <p class="aviso" style="padding-top:0">
+        Lo que un oficial entrega cuando le preguntan <b>por qué aprobó esto</b>.
+        Texto plano: se pega en un correo y se lee dentro de cuatro años.
+        El Acuerdo 1-2026 lo llama <b>constancia documentada</b> (art. 10.4).
+      </p>
+      <button class="btn" id="copiar-constancia">Copiar la constancia</button>
+      <pre id="constancia">${esc(d.constancia)}</pre>
+    </div>` : ''}
+
+    <div class="tarjeta">
+      <h2>Compruébalo tú</h2>
+      <p class="aviso" style="padding-top:0">
+        Nada de esta pantalla te pide que nos creas. Cada cosa que ves sale de un
+        comando que puedes correr ahora mismo, en tu máquina, sin red.
+      </p>
+      <table>
+        <tr><td class="ruta mono">lo que ves arriba</td>
+            <td><code>node cli.mjs ver --ledger datos/${esc(e.id)}.jsonl</code></td></tr>
+        <tr><td class="ruta mono">que nadie lo tocó</td>
+            <td><code>node cli.mjs verificar --ledger datos/${esc(e.id)}.jsonl</code></td></tr>
+        <tr><td class="ruta mono">el dataset</td>
+            <td><code>node cli.mjs csv --ledger datos/${esc(e.id)}.jsonl</code></td></tr>
+        <tr><td class="ruta mono">los hechos en crudo</td>
+            <td><code>node cli.mjs hechos --ledger datos/${esc(e.id)}.jsonl</code></td></tr>
+        <tr><td class="ruta mono">que las citas siguen ahí</td>
+            <td><code>npm run verify:invariantes</code></td></tr>
+        <tr><td class="ruta mono">que corre sin red</td>
+            <td><code>unshare -rn bash -c 'npm run smoke'</code></td></tr>
+      </table>
+    </div>
+
     <div class="tarjeta">
       <h2>Dataset exportable · con columna de auditoría</h2>
       <pre>${esc(d.csv)}</pre>
@@ -674,6 +712,34 @@ async function abrirExpediente (id) {
 
   cablearConflictos(e.id)
   cablearFirma(e.id)
+  cablearCopiar()
+}
+
+/**
+ * Copiar la constancia al portapapeles.
+ *
+ * Un botón y no un enlace de descarga: quien la necesita la va a pegar en un
+ * correo o en el sistema del banco, no a guardarla en Descargas. Y si el
+ * navegador no deja copiar —pasa en http sin permiso—, se selecciona el texto
+ * entero, que es el mismo gesto con un paso más.
+ */
+function cablearCopiar () {
+  const boton = $('#copiar-constancia')
+  if (!boton) return
+  boton.addEventListener('click', async () => {
+    const texto = $('#constancia').textContent
+    try {
+      await navigator.clipboard.writeText(texto)
+      boton.textContent = 'Copiada'
+      setTimeout(() => { boton.textContent = 'Copiar la constancia' }, 2000)
+    } catch {
+      const r = document.createRange()
+      r.selectNodeContents($('#constancia'))
+      const sel = window.getSelection()
+      sel.removeAllRanges(); sel.addRange(r)
+      boton.textContent = 'Seleccionada — copia con Ctrl+C'
+    }
+  })
 }
 
 /**

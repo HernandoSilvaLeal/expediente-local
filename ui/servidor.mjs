@@ -29,7 +29,7 @@ import { join, resolve, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { cargarEsquema } from '../core/esquema.mjs'
-import { abrirExpediente, aCsv } from '../core/expediente.mjs'
+import { abrirExpediente, aCsv, constancia } from '../core/expediente.mjs'
 import { calidad, preguntasPendientes } from '../core/calidad.mjs'
 import { agrupar } from '../core/dedup.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
@@ -148,7 +148,8 @@ const servidor = createServer(async (req, res) => {
         preguntas: preguntasPendientes(e, esquema),
         cadena: verificarCadena(eventos),
         hechos: eventos.map(h => ({ seq: h.seq, ts: h.ts, tipo: h.tipo, origen: h.origen, motivo: h.motivo })),
-        csv: aCsv(e)
+        csv: aCsv(e),
+        constancia: constancia(e, esquema)
       })
     }
 
