@@ -1,0 +1,22 @@
+{
+  "_": "La máquina donde se tomaron las mediciones. Sin esto, un número de rendimiento no significa nada.",
+  "fecha": "2026-09-10T05:30:05.186Z",
+  "cpu": {
+    "modelo": "AMD Ryzen 5 3600 6-Core Processor",
+    "nucleos": 12
+  },
+  "ram_gb": 67.4,
+  "ram_libre_gb": 54.3,
+  "sistema": {
+    "plataforma": "linux",
+    "version": "6.18.16-2-liquorix-amd64",
+    "arquitectura": "x64"
+  },
+  "node": "v24.14.0",
+  "gpu": {
+    "medido": false,
+    "_nota": "El dispositivo real de inferencia se lee de stats.backendDevice (0=CPU, 1=GPU), no de una API del sistema. Se rellena cuando corra ia/extraer.mjs contra el modelo."
+  },
+  "_anonimo": "No se publica el nombre de la máquina ni rutas del usuario.",
+  "_huella_host": 8
+}

@@ -1,0 +1,33 @@
+{
+  "_": "Salida de `npm run metricas`, que ejecuta la suite de verdad y cuenta desde el código.",
+  "fecha": "2026-09-10T05:30:07.108Z",
+  "tests": {
+    "total": 278,
+    "pasan": 278,
+    "fallan": 0
+  },
+  "de_rechazo": {
+    "cantidad": 169,
+    "porcentaje": 60.8,
+    "_nota": "Tests que prueban que algo NO se puede. Probar el camino feliz no demuestra nada."
+  },
+  "fsm": {
+    "estados": 8,
+    "legales": 10,
+    "combinaciones": 64,
+    "ilegales": 54,
+    "terminales": 4,
+    "soloHumano": 2,
+    "exigenMotivo": 3,
+    "superficieCerrada": 84.4
+  },
+  "frontera_95_5": {
+    "total": 18,
+    "conModelo": 1,
+    "sinModelo": 17,
+    "porcentajeDeterminista": 94.4,
+    "concluyente": true,
+    "verificada_por": "npm run test:frontera"
+  },
+  "comando": "npm run metricas"
+}

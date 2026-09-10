@@ -1,0 +1,6 @@
+# NO MEDIDO todavía. Este archivo lo rellena ia/extraer.mjs al correr contra el modelo.
+# Se emite vacío A PROPÓSITO: un log de inferencia inventado sería la clase de dato
+# que, al descubrirse, hace que nadie se crea el resto de la auditoría.
+# La primera fila irá marcada frio=true y NO entra en las medianas: el arranque en frío
+# contamina la media y produce un número que no describe ni el caso frío ni el caliente.
+n,frio,pared_ms,ttft_ms,tok_s,prompt_tokens,emitidos,dispositivo,delegado,caracteres
