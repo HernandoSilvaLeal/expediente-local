@@ -7,6 +7,25 @@
 > Admisión y validación de expedientes de cliente en una sucursal bancaria,
 > con toda la inteligencia artificial corriendo en el propio equipo del banco.
 
+### Qué es, y para quién
+
+**Qué es.** Un oficial de sucursal dicta o fotografía lo que trae el cliente. El
+sistema extrae los datos y, por cada uno, **exige la frase del documento de la
+que sale**. Lo que no puede probar no lo inventa: lo marca como hueco y dice qué
+regla lo paró.
+
+**Para quién.** Para un banco que abre cuentas en sucursales donde el enlace se
+cae, y que responde ante un supervisor por cada expediente. Aquí eso es el
+**Acuerdo 1-2026** de la Superintendencia de Bancos de Panamá, artículos 10.4,
+18 y 29.
+
+**Qué lo hace distinto.** El modelo propone; **el código decide y una persona
+firma**. De dieciocho módulos, uno toca un modelo — y hay un test que falla si
+el núcleo importa el SDK.
+
+> **¿Primera vez aquí y no eres técnico?** → **[EMPIEZA-AQUI.md](EMPIEZA-AQUI.md)**,
+> cuatro pasos y una pantalla.
+
 | | |
 |---|---|
 | **Equipo** | DevCors — Hernando Silva Leal |

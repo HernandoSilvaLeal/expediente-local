@@ -1,8 +1,8 @@
 {
   "_": "Calidad del dataset producido. Mide qué sobrevive a las guardias, no cuánto se llenó.",
-  "fecha": "2026-09-10T18:18:30.224Z",
+  "fecha": "2026-09-10T18:20:10.342Z",
   "dominio": "banca",
-  "expedientes": 3,
+  "expedientes": 4,
   "propuestos": 66,
   "en_expediente": 63,
   "anclados": 60,
@@ -21,7 +21,7 @@
     "G3": 3
   },
   "firmados": 1,
-  "sin_firmar": 2,
+  "sin_firmar": 3,
   "detalle": [
     {
       "id": "EXP-001",
@@ -56,6 +56,18 @@
       "huecos": 0,
       "conflictosAbiertos": 1,
       "completitud": 1,
+      "puedeCerrar": false,
+      "firmadoPor": null
+    },
+    {
+      "id": "PLATA-MARCADOR",
+      "estado": "CAPTURADO",
+      "propuestos": 0,
+      "enExpediente": 0,
+      "anclados": 0,
+      "huecos": 0,
+      "conflictosAbiertos": 0,
+      "completitud": 0,
       "puedeCerrar": false,
       "firmadoPor": null
     }

@@ -13,6 +13,7 @@
     "sucursal": "node scripts/sucursal.mjs",
     "demo": "node scripts/demo.mjs --limpiar",
     "setup": "node scripts/setup.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test": "node --test pruebas/*.test.mjs",
     "test:frontera": "node scripts/verificar-frontera.mjs",

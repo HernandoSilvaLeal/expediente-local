@@ -228,8 +228,15 @@ const FRENTES = [
     items: [
       ['F3.1', 'EMPIEZA-AQUI.md de una pantalla',
         () => existsSync(join(RAIZ, 'EMPIEZA-AQUI.md')) && leer('EMPIEZA-AQUI.md').split('\n').length <= 60],
-      ['F3.2', 'el README abre con qué es y para quién',
-        () => /^#[^\n]*\n[\s\S]{0,900}?(para quién|Para quién|qué es)/.test(leer('README.md'))],
+      // Se mide sobre las primeras 40 líneas y no con un `^#`: el README abre
+      // con un banner, así que anclar al primer carácter medía el formato del
+      // archivo y no lo que se quería saber — si alguien que no es técnico
+      // entiende qué es esto antes de encontrarse el primer comando.
+      ['F3.2', 'el README dice qué es y para quién en las primeras 40 líneas',
+        () => {
+          const cabeza = leer('README.md').split('\n').slice(0, 40).join('\n')
+          return /para qui[eé]n/i.test(cabeza) && /qu[eé] es/i.test(cabeza)
+        }],
       ['F3.3', 'npm run doctor', () => npmScript('doctor')]
     ]
   },
