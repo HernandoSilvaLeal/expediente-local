@@ -26,9 +26,10 @@
 //
 // ── VERSIÓN ────────────────────────────────────────────────────────────────
 //
-// Escrito contra **@qvac/sdk 0.18.2**, abierto y leído en esta máquina el
-// 10-sep-2026. La API está verificada símbolo por símbolo, no supuesta:
-// `_contextInit/01_qvac_sdk/verificado/SDK_0182_VERIFICADO_EN_MAQUINA.md`
+// Escrito contra **@qvac/sdk 0.18.2**, instalado y leído en esta máquina el
+// 10-sep-2026: cada símbolo que se importa aquí se comprobó abriendo el paquete,
+// y los ejemplos oficiales que trae en `dist/examples/` son la fuente de la
+// mecánica de delegación. La API está verificada, no supuesta.
 
 import {
   loadModel, completion, unloadModel, close,

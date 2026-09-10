@@ -42,7 +42,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["tipo", "emisor", "fecha_emision", "monto", "confianza"],
+            "required": ["tipo", "emisor", "fecha_emision", "monto"],
             "properties": {
               "tipo": {
                 "type": "string",
@@ -50,11 +50,7 @@
               },
               "emisor":        { "$ref": "#/$defs/campoTexto" },
               "fecha_emision": { "$ref": "#/$defs/campoTexto" },
-              "monto":         { "$ref": "#/$defs/campoNumero" },
-              "confianza": {
-                "type": "string",
-                "enum": ["Confirmado", "Reportado", "Estimado", "Desconocido"]
-              }
+              "monto":         { "$ref": "#/$defs/campoNumero" }
             }
           }
         }
@@ -87,9 +83,22 @@
 
   "vacios": {
     "texto": "DESCONOCIDO",
-    "numero": 0,
-    "confianza": "Desconocido"
+    "numero": 0
   },
+
+  "$nota_sin_confianza": [
+    "AL MODELO NO SE LE PREGUNTA CUÁNTA CONFIANZA TIENE. Antes había aquí un campo",
+    "'confianza' con enum Confirmado|Reportado|Estimado|Desconocido, y era un error de",
+    "diseño: el modelo devolvía 'Confirmado' sobre datos que las guardias rechazaban",
+    "en el mismo instante. Un modelo calificándose a sí mismo es un examen sin vigilante.",
+    "",
+    "El enunciado del reto pide un puntaje de confianza y el sistema lo da — pero lo",
+    "calcula core/anclaje.mjs con gradoDeEvidencia(), leyendo CÓMO lo dijo la fuente:",
+    "un atenuador ('parece', 'unos') baja a Estimado; un afirmador ('según el documento',",
+    "'consta') permite Confirmado; una afirmación llana es Reportado. Ante la duda, baja.",
+    "",
+    "Regla general: no le pidas al modelo lo que puedes calcular."
+  ],
 
   "unidades": {
     "documentos[].monto": "balboas"

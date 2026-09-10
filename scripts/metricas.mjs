@@ -242,6 +242,36 @@ function medirRelacionSoftwareIa () {
   }
 }
 
+/**
+ * Corre scripts/verificar-entrega.mjs y devuelve qué puertas pasaron.
+ *
+ * Existe para MOVER CASILLAS DE DECLARADAS A MEDIDAS. Cada vez que algo que se
+ * marcaba a mano pasa a verificarse por comando, el tablero vale un poco más.
+ * El movimiento contrario nunca es aceptable.
+ */
+function medirEntrega () {
+  let salida = ''
+  try {
+    salida = execFileSync(process.execPath, ['scripts/verificar-entrega.mjs'],
+      { cwd: RAIZ, encoding: 'utf8', timeout: 300_000 })
+  } catch (e) { salida = (e.stdout ?? '') + (e.stderr ?? '') }
+
+  const paso = (fragmento) => {
+    const linea = salida.split('\n').find(l => l.includes(fragmento))
+    return Boolean(linea && linea.includes('PASS'))
+  }
+  return {
+    corrio: salida.includes('VERIFICACIÓN DE ENTREGA'),
+    rutasAbsolutas:  paso('rutas absolutas'),
+    jergaInterna:    paso('jerga interna'),
+    placeholders:    paso('placeholders'),
+    basePreexistente: paso('base preexistente'),
+    licencia:        paso('LICENSE'),
+    depsFijadas:     paso('dependencias declaradas'),
+    smoke:           paso('smoke sale con JSON')
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  MEDICIÓN 5 · las puertas
 // ═══════════════════════════════════════════════════════════════════════════
@@ -277,7 +307,8 @@ function definirPuertas (m) {
         auto('cli.mjs punta a punta', hay('cli.mjs')),
         auto('casos de uso de sucursal, punta a punta', contarCasosDeUso() >= 6,
              contarCasosDeUso() ? `${contarCasosDeUso()} escenarios` : ''),
-        decl('corre bajo unshare -rn y sale JSON válido', 'bronce_sin_red', 'unshare -rn bash -c "npm run smoke"'),
+        auto('el smoke recorre el flujo completo y sale JSON', m.entrega.smoke, 'npm run smoke'),
+        decl('el smoke corre DENTRO de unshare -rn', 'bronce_sin_red', 'unshare -rn bash -c "npm run smoke"'),
         decl('README con los 4 pasos de instalación medidos', 'bronce_readme_instalacion', 'seguirlo en máquina limpia')
       ]
     },
@@ -313,11 +344,16 @@ function definirPuertas (m) {
       casillas: [
         auto('README existe', hay('README.md')),
         auto('LICENSE existe', hay('LICENSE')),
-        decl('§13 base preexistente, recorriendo package.json entero', 'desc_base_preexistente', 'art. 11c'),
+        // Estas cinco EMPEZARON siendo declaradas a mano y ahora las verifica
+        // scripts/verificar-entrega.mjs. Mover casillas en esta dirección es el
+        // único progreso real del tablero; el movimiento contrario, nunca.
+        auto('§13 base preexistente en el README', m.entrega.basePreexistente, 'art. 11c'),
+        auto('cero rutas absolutas de esta máquina', m.entrega.rutasAbsolutas, 'medido'),
+        auto('cero jerga interna en el repo público', m.entrega.jergaInterna, 'medido'),
+        auto('cero placeholders sin rellenar', m.entrega.placeholders, 'medido'),
+        auto('dependencias fijadas, sin ^ ni ~', m.entrega.depsFijadas, '@qvac/sdk 0.18.2 exacta'),
         decl('video ≤ 5:00 medido con ffprobe', 'desc_video_duracion', 'ffprobe -show_entries format=duration'),
         decl('video accesible en incógnito Y desde el móvil', 'desc_video_acceso', 'no listado, nunca privado'),
-        decl('cero rutas absolutas /home/ en el repo', 'desc_sin_rutas_absolutas', 'grep -rn "/home/" --include=*.mjs'),
-        decl('cero placeholders {{ }} en el README', 'desc_sin_placeholders', 'grep -c "{{" README.md'),
         decl('repo público, abierto sin sesión', 'desc_repo_publico', 'incógnito sobre la URL'),
         decl('clon limpio arranca siguiendo el README', 'desc_clon_limpio', 'HOME=/tmp/juez git clone && npm ci && npm run smoke'),
         decl('formulario enviado y reabierto para confirmar', 'desc_formulario', 'captura del envío')
@@ -426,7 +462,8 @@ async function main () {
   const fsm = await medirFsm()
   const frontera = medirFrontera()
   const proporcion = medirRelacionSoftwareIa()
-  const m = { modulos, pruebas, fsm, frontera, proporcion }
+  const entrega = medirEntrega()
+  const m = { modulos, pruebas, fsm, frontera, proporcion, entrega }
   const puertas = definirPuertas(m)
   const cualidad = medirCualidad(modulos, pruebas)
 
@@ -440,7 +477,7 @@ async function main () {
       lineasComentario: modulos.reduce((a, x) => a + x.comentario, 0),
       nucleo: { hecho: nucleoHecho.length, exigido: NUCLEO_EXIGIDO.length }
     },
-    pruebas, fsm, frontera, proporcion, cualidad,
+    pruebas, fsm, frontera, proporcion, entrega, cualidad,
     puertas: Object.fromEntries(Object.entries(puertas).map(([k, v]) => [k, {
       corte: v.corte,
       hechas: v.casillas.filter(c => c.ok).length,

@@ -57,8 +57,7 @@ const EXTRACCION_BUENA = {
     tipo: 'RECIBO_SERVICIO',
     emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
     fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto:         { valor: 45.30, cita: 'por 45.30 balboas' },
-    confianza: 'Reportado'
+    monto:         { valor: 45.30, cita: 'por 45.30 balboas' }
   }]
 }
 
@@ -111,8 +110,7 @@ test('CU-2 · MEDIDO · las tres invenciones reales del 9-sep quedan fuera', () 
         emisor:        { valor: 'ETESA', cita: 'el recibo del IDAAN' },
         fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
         // (c) CANTIDAD CAMBIADA: el número no está en su propia cita
-        monto:         { valor: 999.99, cita: 'por 45.30 balboas' },
-        confianza: 'Confirmado'
+        monto:         { valor: 999.99, cita: 'por 45.30 balboas' }
       }]
     }
 

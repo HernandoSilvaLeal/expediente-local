@@ -29,8 +29,7 @@ const bueno = () => ({
     tipo: 'RECIBO_SERVICIO',
     emisor:        { valor: 'IDAAN',          cita: 'el recibo del IDAAN' },
     fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto:         { valor: 45.30,            cita: 'por 45.30 balboas' },
-    confianza: 'Reportado'
+    monto:         { valor: 45.30,            cita: 'por 45.30 balboas' }
   }]
 })
 
@@ -94,10 +93,23 @@ test('T4-G2-01 · un tipo de documento fuera del enum se rechaza', () => {
     'el esquema declara qué tipos existen; lo demás no existe')
 })
 
-test('T4-G2-02 · un grado de confianza inventado se rechaza', () => {
+test('T4-G2-02 · AL MODELO NO SE LE PREGUNTA CUÁNTA CONFIANZA TIENE', () => {
+  // El esquema tenía un campo `confianza` que el modelo rellenaba, y era un error
+  // de diseño: devolvía "Confirmado" sobre datos que las guardias rechazaban en el
+  // mismo instante. Un modelo calificándose a sí mismo es un examen sin vigilante.
+  //
+  // El reto pide un puntaje de confianza y el sistema lo da — pero lo calcula
+  // gradoDeEvidencia() leyendo CÓMO lo dijo la fuente. Ahora, si el modelo intenta
+  // colar su autoevaluación, G5 la marca como campo intruso.
+  assert.equal(specDeCampo(ESQ, 'documentos[0].confianza'), undefined,
+    'el esquema ya no le pregunta al modelo cuánta confianza tiene')
+
   const e = bueno()
-  e.documentos[0].confianza = 'Segurísimo'
-  assert.ok(motivos(revisar(e, ESQ, FUENTE), 'documentos[0].confianza').includes(RECHAZO.FUERA_DE_ENUM))
+  e.documentos[0].confianza = 'Confirmado'
+  const c = campo(revisar(e, ESQ, FUENTE), 'documentos[0].confianza')
+  assert.equal(c.aceptado, false)
+  assert.deepEqual(c.rechazos.map(x => x.motivo), [RECHAZO.CAMPO_INTRUSO],
+    'no le pidas al modelo lo que puedes calcular')
 })
 
 test('T4-G2-03 · el enum se comprueba aunque el nodo no tenga cita', () => {
@@ -291,6 +303,7 @@ test('T4-08 · el resumen cuenta por guardia y por motivo', () => {
   e.documentos[0].tipo   = 'ESCRITURA_PUBLICA'                                  // G2
   e.documentos[0].emisor = { valor: 'ETESA', cita: 'el recibo del IDAAN' }      // G3
   e.titular.pasaporte    = { valor: 'X', cita: 'El titular' }                   // G5
+  // Nota: `bueno()` ya no trae `confianza`, así que estos son exactamente 3.
   const { resumen } = revisar(e, ESQ, FUENTE)
 
   assert.equal(resumen.porGuardia.G2, 1)

@@ -1,0 +1,12 @@
+{
+  "titular": {
+    "nombre": { "valor": "Juan Pérez González", "cita": "El titular es Juan Pérez González" },
+    "cedula": { "valor": "8-999-999", "cita": "cédula 8-999-999" }
+  },
+  "documentos": [{
+    "tipo": "RECIBO_SERVICIO",
+    "emisor":        { "valor": "ETESA", "cita": "el recibo del IDAAN" },
+    "fecha_emision": { "valor": "12 de marzo de 2026", "cita": "del 12 de marzo de 2026" },
+    "monto":         { "valor": 999.99, "cita": "por 45.30 balboas" }
+  }]
+}

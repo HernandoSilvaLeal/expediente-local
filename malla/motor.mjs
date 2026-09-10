@@ -1,7 +1,15 @@
-// ARQUITECTO — DELEGACION DE INFERENCIA ENTRE PARES sobre el canal Protomux ya probado.
-// Cierra el hueco que PILAR_2 dejo NO PROBADO: el peer sin modelo pide, el peer con modelo infiere.
-//   node arq-05-delegacion.mjs --role motor       --bootstrap 127.0.0.1:49737
-//   node arq-05-delegacion.mjs --role solicitante --bootstrap 127.0.0.1:49737
+// malla/motor.mjs — delegación de inferencia entre pares sobre un canal Protomux propio.
+//
+// El par CAMPO no tiene modelo, no tiene GPU y no tiene el SDK: pide.
+// El par MOTOR tiene la GPU: infiere y responde.
+//
+//   node malla/motor.mjs --role motor --bootstrap <IP-LAN>:49737 --modelo <ruta.gguf>
+//
+// ⚠️ ESTA ES LA VÍA PROPIA, hecha sobre Protomux. El SDK 0.18.2 trae ADEMÁS una
+//    delegación nativa (startQVACProvider + delegate en loadModel) que usa su
+//    propio hyperswarm. Las dos están en el repo a propósito: son dos pilas de
+//    red distintas, y si una no atraviesa la red de la sucursal, la otra puede.
+//    Ver malla/proveedor.mjs.
 import Hyperswarm from 'hyperswarm'
 import DHT from 'hyperdht'
 import Protomux from 'protomux'
@@ -20,7 +28,16 @@ const BOOTSTRAP = arg('bootstrap') ? arg('bootstrap').split(',').map(s => { cons
 const T0 = Date.now()
 const log = (...a) => console.log(`[${NAME}] +${((Date.now() - T0) / 1000).toFixed(1)}s`, ...a)
 
-const MODELO = '/home/nando/Escritorio/projects/hackQVAC/_lab/models/medpsy-1.7b-q4_k_m-imat.gguf'
+// La ruta del modelo se RECIBE. Estaba cableada a una ruta absoluta de esta
+// máquina, y así el clon del juez reventaba sin decir por qué. Es el modo de
+// muerte más tonto del hackathon y ya casi ocurre.
+const MODELO = arg('modelo', process.env.EXPEDIENTE_MODELO)
+if (!MODELO && ROLE === 'motor') {
+  console.error('\n  🔴 Falta la ruta del modelo.')
+  console.error('     node malla/motor.mjs --role motor --modelo <ruta.gguf>')
+  console.error('     o bien:  EXPEDIENTE_MODELO=<ruta.gguf> node malla/motor.mjs\n')
+  process.exit(1)
+}
 const SCHEMA = { type:'object', properties:{
   cliente:{type:'string'}, ciudad:{type:'string'}, pais:{type:'string'},
   observaciones:{type:'array',items:{type:'object',properties:{
