@@ -33,7 +33,7 @@
 // PROHIBIDO aquí: importar @qvac/sdk. Verificado por scripts/verificar-frontera.mjs
 
 import { specDeCampo, esCampo, rutaGenerica } from './esquema.mjs'
-import { anclar, MOTIVO, normalizar, numerosDe } from './anclaje.mjs'
+import { anclar, MOTIVO, normalizar, numerosDe, ubicarValor } from './anclaje.mjs'
 
 /** Motivos de rechazo. Enum cerrado: el rechazo es un DATO que se cuenta y se audita. */
 export const RECHAZO = Object.freeze({
@@ -44,7 +44,9 @@ export const RECHAZO = Object.freeze({
   UNIDAD_AUSENTE:    'UNIDAD_AUSENTE',     // G4
   UNIDAD_EN_VALOR:   'UNIDAD_EN_VALOR',    // G4
   CAMPO_INTRUSO:     'CAMPO_INTRUSO',      // G5 — el esquema no lo declara
-  CAMPO_AUSENTE:     'CAMPO_AUSENTE'       // G5 — el esquema lo exige y no vino
+  CAMPO_AUSENTE:     'CAMPO_AUSENTE',      // G5 — el esquema lo exige y no vino
+  CITA_COMPARTIDA:   'CITA_COMPARTIDA',    // G9 — dos entidades reclaman el mismo texto
+  CITA_MULTIFRASE:   'CITA_MULTIFRASE'     // G10 — la cita salta de una frase a otra
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -264,10 +266,144 @@ export function revisar (extraido, esquema, fuente) {
   recorrer(extraido, '', campos, esquema, fuente)
   exigirRequeridos(extraido, esquema, campos)
 
+  const revisados = atribucionCruzada(citaDeUnaSolaFrase(campos), fuente)
+
   return Object.freeze({
-    campos: Object.freeze(campos),
-    resumen: resumir(campos, esquema)
+    campos: Object.freeze(revisados),
+    resumen: resumir(revisados, esquema)
   })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  G9 · ATRIBUCIÓN CRUZADA — dos entidades no reclaman el mismo texto
+//
+//  ── EL ATAQUE QUE LA REGLA DE ORO NO PARABA ────────────────────────────────
+//
+//  Encontrado por una auditoría adversarial sobre el dictado real del repo, y
+//  es el más elegante de todos los que aparecieron: **no hace falta inventar
+//  una cita para colar un dato falso. Basta con ensancharla.**
+//
+//    fuente:  «Tienen tres resonadores magnéticos Siemens y un tomógrafo.
+//              Uno de los resonadores parece de unos ocho años.»
+//
+//    equipos[1] es el TOMÓGRAFO, y el modelo devuelve:
+//      fabricante {valor:"Siemens", cita:"resonadores magnéticos Siemens y un tomógrafo"}
+//      cantidad   {valor:3,         cita:"tres resonadores magnéticos Siemens y un tomógrafo"}
+//
+//  Las dos citas son CIEN POR CIEN literales. G3 las acepta, y con razón: están
+//  ahí. El expediente acababa afirmando que hay tres tomógrafos Siemens de ocho
+//  años, cuando la fuente dice uno, sin marca y sin edad. Los tres errores que
+//  este proyecto enseña en su README pasaban enteros por la puerta principal.
+//
+//  ── LA DEFENSA, Y POR QUÉ ESTA Y NO OTRA ───────────────────────────────────
+//
+//  «Cita demasiado larga» no sirve: la del fabricante tiene seis palabras, y
+//  citas legítimas mucho más largas existen. La longitud no distingue.
+//
+//  Lo que sí distingue es la POSICIÓN. La palabra «Siemens» aparece UNA vez en
+//  el documento. Si el resonador y el tomógrafo apuntan los dos a esa misma
+//  aparición, uno de los dos está mintiendo — y eso es aritmética de índices,
+//  no interpretación.
+//
+//  Se rechaza el del elemento POSTERIOR, no los dos: marcar ambos deja al
+//  oficial sin nada, y el primero es el que la fuente presenta primero.
+//
+//  Solo aplica ENTRE ELEMENTOS DISTINTOS DE UN MISMO ARRAY. Dos campos del
+//  mismo elemento pueden solaparse sin problema —el tipo y la marca del mismo
+//  aparato salen de la misma frase—, y eso es correcto.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function atribucionCruzada (campos, fuente) {
+  if (!fuente) return campos
+
+  // ruta genérica + posición exacta → quién la reclamó primero
+  const reclamado = new Map()
+  const rechazar = new Set()
+
+  for (const c of campos) {
+    if (!c.aceptado) continue
+    const elemento = elementoDe(c.ruta)
+    if (elemento === null) continue          // no es parte de un array: no aplica
+
+    const donde = ubicarValor(c.valor, c.cita, fuente)
+    if (!donde) continue
+
+    const clave = `${rutaGenerica(c.ruta)}@${donde.desde}-${donde.hasta}`
+    const dueno = reclamado.get(clave)
+    if (dueno === undefined) { reclamado.set(clave, { elemento, ruta: c.ruta }); continue }
+    if (dueno.elemento === elemento) continue    // el mismo elemento: legítimo
+
+    rechazar.add(c.ruta)
+  }
+
+  if (!rechazar.size) return campos
+
+  return campos.map(c => {
+    if (!rechazar.has(c.ruta)) return c
+    const dueno = reclamado.get(`${rutaGenerica(c.ruta)}@${ubicarValor(c.valor, c.cita, fuente).desde}-${ubicarValor(c.valor, c.cita, fuente).hasta}`)
+    return Object.freeze({
+      ...c, aceptado: false, propuesto: c.valor,
+      valor: 'DESCONOCIDO', evidencia: 'Desconocido',
+      rechazos: Object.freeze([...c.rechazos, {
+        guardia: 'G9', motivo: RECHAZO.CITA_COMPARTIDA,
+        detalle: `«${c.valor}» ya lo reclamó ${dueno?.ruta ?? 'otra entidad'} en el mismo punto del texto: ` +
+                 'dos cosas distintas no pueden salir de la misma palabra'
+      }])
+    })
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  G10 · UNA CITA NO SALTA DE FRASE
+//
+//  El tercer campo del ataque de la cita ancha, y el que G9 no alcanza porque
+//  ninguna otra entidad reclama esa palabra:
+//
+//    equipos[1] (el TOMÓGRAFO) → antiguedad_anios {valor: 8,
+//      cita: "y un tomógrafo. Uno de los resonadores parece de unos ocho años"}
+//
+//  La cita es literal. Empieza hablando del tomógrafo y termina hablando de los
+//  resonadores, y en medio hay un punto. La edad pertenece a la segunda frase;
+//  la entidad, a la primera. Pegando las dos, el modelo le presta al tomógrafo
+//  una edad que la fuente le dio a otro aparato.
+//
+//  ── POR QUÉ ESTA REGLA Y NO UN LÍMITE DE LONGITUD ──────────────────────────
+//
+//  Un límite de palabras sería un umbral inventado —y el curso oficial de QVAC
+//  desaconseja justamente eso—, además de tener que elegir un número que no
+//  sabríamos defender. «La cita no cruza un punto» no tiene número: o lo cruza
+//  o no. Y se explica en una frase ante un jurado: **una cita que salta de una
+//  frase a otra no está citando, está construyendo.**
+//
+//  Se mira sobre la cita ORIGINAL, no la normalizada, porque normalizar quita
+//  la puntuación — que aquí es justo el dato. Y un punto entre dígitos («45.30»)
+//  o dentro de una palabra no separa frases: hace falta el espacio detrás.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SALTO_DE_FRASE = /[.;]\s|\n/
+
+function citaDeUnaSolaFrase (campos) {
+  return campos.map(c => {
+    if (!c.aceptado || !c.cita) return c
+    // Los bordes no cuentan: una cita que TERMINA en punto es una frase entera.
+    const dentro = String(c.cita).trim().replace(/[.;\s]+$/, '')
+    if (!SALTO_DE_FRASE.test(dentro)) return c
+    return Object.freeze({
+      ...c, aceptado: false, propuesto: c.valor,
+      valor: 'DESCONOCIDO', evidencia: 'Desconocido',
+      rechazos: Object.freeze([...c.rechazos, {
+        guardia: 'G10', motivo: RECHAZO.CITA_MULTIFRASE,
+        detalle: 'la cita cruza de una frase a otra: el valor y la entidad que lo recibe ' +
+                 'no salen del mismo enunciado'
+      }])
+    })
+  })
+}
+
+/** El índice del elemento de array al que pertenece una ruta, o null. */
+function elementoDe (ruta) {
+  const m = String(ruta).match(/\[(\d+)\]/)
+  return m ? m[0] + ruta.slice(0, ruta.indexOf('[')) : null
 }
 
 function recorrer (nodo, ruta, acc, esquema, fuente) {

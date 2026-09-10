@@ -12,6 +12,7 @@ import { cargarEsquema, specDeCampo, rutaGenerica, resolverRef } from '../core/e
 import { revisar, GUARDIAS, RECHAZO } from '../core/guardias.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
+const ESQ_SALUD = cargarEsquema('instancias/salud/esquema.json')
 
 /** La fuente de todos los casos: un texto de sucursal, sintético y ficticio. */
 const FUENTE =
@@ -378,4 +379,91 @@ test('T4-17 · rutaGenerica normaliza los índices', () => {
   assert.equal(rutaGenerica('documentos[0].tipo'), 'documentos[].tipo')
   assert.equal(rutaGenerica('a[12].b[3].c'), 'a[].b[].c')
   assert.equal(rutaGenerica('titular.nombre'), 'titular.nombre')
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  G9 y G10 · ⭐ EL ATAQUE DE LA CITA ANCHA
+//
+//  El hallazgo más elegante de la auditoría adversarial: **no hace falta
+//  inventar una cita para colar un dato falso. Basta con ensancharla.**
+//
+//  Sobre el dictado REAL del repositorio, con citas cien por cien literales,
+//  el expediente acababa afirmando que hay tres tomógrafos Siemens de ocho
+//  años. La fuente dice un tomógrafo, sin marca y sin edad. Los tres errores
+//  que este proyecto enseña en su README pasaban enteros por la puerta
+//  principal, y G3 los aceptaba con razón: las citas estaban ahí.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FUENTE_ANCHA =
+  'Estoy en Hospital DemoCare Pacific, en Panamá. Tienen tres resonadores ' +
+  'magnéticos Siemens y un tomógrafo. Uno de los resonadores parece de unos ocho años.'
+
+test('G9 · dos entidades NO pueden reclamar la misma palabra del texto', () => {
+  const r = revisar({
+    equipos: [
+      { modalidad: { valor: 'MRI', cita: 'tres resonadores magnéticos' },
+        fabricante: { valor: 'Siemens', cita: 'tres resonadores magnéticos Siemens' } },
+      { modalidad: { valor: 'CT', cita: 'y un tomógrafo' },
+        fabricante: { valor: 'Siemens', cita: 'resonadores magnéticos Siemens y un tomógrafo' } }
+    ]
+  }, ESQ_SALUD, FUENTE_ANCHA)
+
+  const uno = r.campos.find(c => c.ruta === 'equipos[0].fabricante')
+  const dos = r.campos.find(c => c.ruta === 'equipos[1].fabricante')
+
+  assert.ok(uno.aceptado, 'el primero que reclama la palabra se la queda')
+  assert.equal(dos.aceptado, false, 'el segundo no: «Siemens» aparece una vez en el documento')
+  assert.ok(dos.rechazos.some(x => x.guardia === 'G9'),
+    'y lo dice G9, no un rechazo genérico: el oficial tiene que saber por qué')
+})
+
+test('G9 · pero dos campos del MISMO elemento sí comparten frase', () => {
+  // El tipo y la marca del mismo aparato salen de la misma línea, y eso es
+  // exactamente lo normal. Una guardia que lo prohibiera sería inservible.
+  const r = revisar({
+    equipos: [{ modalidad: { valor: 'MRI', cita: 'tres resonadores magnéticos Siemens' },
+                fabricante: { valor: 'Siemens', cita: 'tres resonadores magnéticos Siemens' } }]
+  }, ESQ_SALUD, FUENTE_ANCHA)
+
+  assert.ok(r.campos.filter(c => c.ruta.startsWith('equipos[0]')).every(c => c.aceptado || c.rechazos.every(x => x.guardia !== 'G9')),
+    'G9 no se mete entre campos del mismo elemento')
+})
+
+test('G10 · ⭐ una cita que salta de frase no está citando: está construyendo', () => {
+  const r = revisar({
+    equipos: [{
+      modalidad: { valor: 'CT', cita: 'y un tomógrafo' },
+      // Literal, palabra por palabra. Y pega el final de una frase con la
+      // siguiente, prestándole al tomógrafo la edad de los resonadores.
+      antiguedad_anios: { valor: 8, cita: 'y un tomógrafo. Uno de los resonadores parece de unos ocho años' }
+    }]
+  }, ESQ_SALUD, FUENTE_ANCHA)
+
+  const edad = r.campos.find(c => c.ruta === 'equipos[0].antiguedad_anios')
+  assert.equal(edad.aceptado, false, 'la edad no entra: no sale del mismo enunciado que la entidad')
+  assert.ok(edad.rechazos.some(x => x.guardia === 'G10'))
+})
+
+test('G10 · una cita que TERMINA en punto sigue siendo una sola frase', () => {
+  // El borde no cuenta. Si contara, la mitad de las citas legítimas caerían y
+  // la guardia sería ruido en vez de defensa.
+  const r = revisar({
+    equipos: [{ modalidad: { valor: 'CT', cita: 'Tienen tres resonadores magnéticos Siemens y un tomógrafo.' } }]
+  }, ESQ_SALUD, FUENTE_ANCHA)
+
+  const m = r.campos.find(c => c.ruta === 'equipos[0].modalidad')
+  assert.ok(m.rechazos.every(x => x.guardia !== 'G10'), 'no la para G10')
+})
+
+test('G10 · un decimal no es un salto de frase', () => {
+  // «45.30» lleva punto y no separa nada: hace falta el espacio detrás.
+  const r = revisar({
+    titular: { nombre: { valor: 'Ana Ruiz', cita: 'Titular Ana Ruiz' } },
+    documentos: [{ tipo: 'RECIBO_SERVICIO',
+      emisor: { valor: 'IDAAN', cita: 'recibo del IDAAN' },
+      monto: { valor: 45.30, cita: 'por 45.30 balboas' } }]
+  }, ESQ, 'Titular Ana Ruiz presenta recibo del IDAAN por 45.30 balboas')
+
+  const monto = r.campos.find(c => c.ruta === 'documentos[0].monto')
+  assert.ok(monto.rechazos.every(x => x.guardia !== 'G10'), 'un decimal no es dos frases')
 })

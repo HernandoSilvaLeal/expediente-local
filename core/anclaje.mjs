@@ -151,6 +151,72 @@ function apareceComoPalabra (aguja, pajar) {
 }
 
 /**
+ * ¿Dónde ancla esta cita en la fuente? Devuelve `{desde, hasta}` sobre el texto
+ * NORMALIZADO, o null si no ancla.
+ *
+ * Es el mismo recorrido que `citaEstaEnFuente`, pero devolviendo la posición en
+ * vez de un sí o un no. Sirve para dos cosas:
+ *
+ *   · saber si DOS entidades distintas están reclamando el MISMO trozo de texto,
+ *     que es como se cuela una atribución falsa con citas literales (ver G9)
+ *   · poder resaltar el fragmento exacto en la interfaz, en vez de pedir que
+ *     alguien se fíe
+ *
+ * El índice va sobre el texto normalizado a propósito y se dice: es el mismo
+ * sobre el que se compara. Devolver una posición del texto original obligaría a
+ * mapear entre dos longitudes distintas, que es exactamente el desfase que ya
+ * rompió la ventana de contexto una vez.
+ */
+export function ubicarCita (cita, fuente) {
+  const c = normalizar(cita)
+  const f = normalizar(fuente)
+  if (!c || !f) return null
+  for (let desde = 0; ; desde++) {
+    const i = f.indexOf(c, desde)
+    if (i === -1) return null
+    const abre = i === 0 || f[i - 1] === ' '
+    const cierra = i + c.length === f.length || f[i + c.length] === ' '
+    if (abre && cierra) return Object.freeze({ desde: i, hasta: i + c.length })
+    desde = i
+  }
+}
+
+/**
+ * ¿Dónde cae el VALOR dentro de la fuente, contando desde donde empieza su cita?
+ *
+ * Es la posición que de verdad importa para detectar atribuciones cruzadas: dos
+ * entidades pueden citar fragmentos distintos y aun así estar señalando la misma
+ * palabra. «Siemens» aparece una vez en el documento; si el resonador y el
+ * tomógrafo apuntan los dos a ESA palabra, uno de los dos miente.
+ */
+export function ubicarValor (valor, cita, fuente) {
+  const donde = ubicarCita(cita, fuente)
+  if (!donde) return null
+  const f = normalizar(fuente)
+  const trozo = f.slice(donde.desde, donde.hasta)
+
+  const candidatos = typeof valor === 'number'
+    ? [String(valor), NUMERO_A_PALABRA[valor]].filter(Boolean)
+    : [normalizar(valor)]
+
+  for (const v of candidatos) {
+    if (!v) continue
+    for (let d = 0; ; d++) {
+      const i = trozo.indexOf(v, d)
+      if (i === -1) break
+      const abre = i === 0 || trozo[i - 1] === ' '
+      const cierra = i + v.length === trozo.length || trozo[i + v.length] === ' '
+      if (abre && cierra) return Object.freeze({ desde: donde.desde + i, hasta: donde.desde + i + v.length })
+      d = i
+    }
+  }
+  // El valor está en la cita pero no como palabra suelta (un decimal escrito de
+  // otra forma, por ejemplo). Se devuelve el rango de la cita: es menos preciso,
+  // y decirlo aquí es mejor que devolver una posición inventada.
+  return donde
+}
+
+/**
  * ¿Está el valor dentro de su propia cita?
  *
  * Atrapa el caso sutil: el modelo devuelve una cita REAL pero un valor que no

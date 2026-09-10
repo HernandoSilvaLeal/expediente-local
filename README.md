@@ -74,11 +74,11 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **316 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **322 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
-| Que **cada guardia** hace su trabajo | `npm run casos` | **15 casos trampa**, cobertura G1..G8 |
+| Que **cada guardia** hace su trabajo | `npm run casos` | **15 casos trampa**, cobertura G1..G10 |
 | Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
 | **Los datos de ejemplo** | `npm run demo` | tres expedientes sembrados en 2 s: uno limpio, uno con invenciones, uno en conflicto |
@@ -265,7 +265,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 316 tests, sin modelo y sin red
+npm test                  # 322 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -280,7 +280,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **316/316** | 1 s |
+| `npm test` → **322/322** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
@@ -344,10 +344,10 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **316 / 316** verdes, sin modelo y sin red |
+| Tests | **322 / 322** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **~62 %** |
 | Casos de uso punta a punta | **18** |
-| Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G8 |
+| Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G10 |
 | Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
 | Puertas de entrega en PASS | **12 / 12** |
