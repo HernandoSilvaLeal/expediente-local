@@ -262,6 +262,20 @@ const COMO_SE_DICE = Object.freeze({
   'documentos[].monto':         'el monto del documento'
 })
 
+/**
+ * Se EXPORTA porque la pantalla necesita exactamente esta traducción.
+ *
+ * La alternativa era tener la tabla también en `ui/`, y ya sabemos cómo acaba
+ * eso: dos listas de lo mismo que se van separando hasta que una caza a la
+ * otra. Pasó con el expediente de prueba y pasó con la lista negra.
+ *
+ * Y aquí habría sido peor de lo normal, porque la divergencia no se vería: la
+ * pregunta diría «la cédula» y la tabla de al lado, en la misma pantalla,
+ * seguiría diciendo `titular.cedula`. Nadie lo lee como un fallo; se lee como
+ * que el sistema habla así.
+ */
+export function comoSeDice (ruta) { return legible(ruta) }
+
 function legible (ruta) {
   const generica = rutaGenerica(ruta)
   if (COMO_SE_DICE[generica]) return COMO_SE_DICE[generica]

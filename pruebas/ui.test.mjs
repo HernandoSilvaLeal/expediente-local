@@ -90,6 +90,48 @@ const post = (ruta, cuerpo, cabeceras = {}) =>
     body: JSON.stringify(cuerpo)
   })
 
+/**
+ * Saca del script servido el TEXTO de unas cuantas funciones puras y las
+ * devuelve vivas, para poder probarlas aquí.
+ *
+ * ── POR QUÉ NO SE EJECUTA EL SCRIPT ENTERO ─────────────────────────────────
+ *
+ * Porque al final cablea el DOM y arranca la carga: `document` no existe en
+ * Node, y sortearlo con un DOM de mentira habría hecho que estas pruebas
+ * dependieran de lo fiel que sea la imitación en vez de del código.
+ *
+ * ── Y POR QUÉ NO SE COPIAN AQUÍ ────────────────────────────────────────────
+ *
+ * Porque una copia de `resaltar()` en el test es un verificador probando su
+ * propia versión de lo verificado, que es el patrón que ya nos costó cuatro
+ * fallos. Lo que se ejecuta aquí es el mismo texto que recibe el navegador.
+ *
+ * Cuenta llaves, así que asume que las que hay dentro de cadenas y expresiones
+ * regulares están equilibradas. Hoy lo están, y si algún día dejan de estarlo
+ * el `new Function` de abajo no compila y esto se pone rojo en vez de mentir.
+ */
+function funcionesDe (js, nombres) {
+  let fuente = ''
+  for (const nombre of nombres) {
+    // Una declaración de una sola línea —`const esc = …`, `let ETIQUETAS = {}`—
+    // se lleva entera. No hay llaves que contar.
+    const suelta = new RegExp(`^\\s*(?:const|let)\\s+${nombre}\\s*=.*$`, 'm').exec(js)
+    if (suelta) { fuente += suelta[0].trim() + '\n'; continue }
+
+    const i = js.search(new RegExp(`(?:async\\s+)?function\\s+${nombre}\\s*\\(`))
+    assert.notEqual(i, -1, `no se encontró ${nombre} en el script servido`)
+    let llaves = 0, fin = -1, visto = false
+    for (let j = js.indexOf('{', i); j < js.length; j++) {
+      if (js[j] === '{') { llaves++; visto = true }
+      else if (js[j] === '}') { llaves-- }
+      if (visto && llaves === 0) { fin = j + 1; break }
+    }
+    assert.notEqual(fin, -1, `no se cerró function ${nombre}`)
+    fuente += js.slice(i, fin) + '\n'
+  }
+  return new Function(`${fuente}\nreturn { ${nombres.join(', ')} }`)()
+}
+
 before(async () => {
   // Los datos son una COPIA: un test que aprueba un expediente no puede
   // estropear la demo que el Comandante tenga abierta.
@@ -128,12 +170,30 @@ test('UI-02 · ⭐ cada función del script está UNA sola vez', async () => {
   const html = await (await fetch(`${BASE}/`)).text()
   const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
 
-  for (const decl of ['function resaltar', 'function normalizar', 'function cablearConflictos',
-                      'function cablearFirma', 'function pintarCaptura', 'function seguirCambios',
-                      'function puedeFirmar', 'function reparto',
-                      'async function abrirExpediente', 'async function cargarLista',
-                      'const QUIEN', 'let refresco', 'let ESQUEMA']) {
-    assert.equal(js.split(decl).length - 1, 1, `"${decl}" tiene que aparecer exactamente una vez`)
+  // ── SE CUENTA LA DECLARACIÓN ENTERA, NO SU PREFIJO ───────────────────────
+  //
+  // La primera versión buscaba `'function normalizar'` como subcadena, así que
+  // el día que apareció `normalizarConMapa` el test dio dos y acusó de duplicado
+  // a una función que no lo estaba. Es el mismo patrón que rompió la regla de
+  // oro —«500 balboas» casaba dentro de «4500 balboas»— cometido dentro del test
+  // escrito para cazar duplicados. Van ocho.
+  //
+  // Se exige el paréntesis o el `=` que abre la declaración: eso es una
+  // frontera de verdad, no un parecido.
+  const NOMBRES = ['resaltar', 'normalizar', 'normalizarConMapa', 'cablearConflictos',
+                   'cablearFirma', 'cablearDocumento', 'pintarCaptura', 'seguirCambios',
+                   'puedeFirmar', 'reparto', 'etiquetaDe',
+                   'abrirExpediente', 'cargarLista']
+  for (const nombre of NOMBRES) {
+    const decl = new RegExp(`(?:async\\s+)?function\\s+${nombre}\\s*\\(`, 'g')
+    assert.equal((js.match(decl) ?? []).length, 1,
+      `function ${nombre}() tiene que declararse exactamente una vez`)
+  }
+  for (const [decl, nombre] of [['const', 'QUIEN'], ['let', 'refresco'],
+                                ['let', 'ESQUEMA'], ['let', 'ETIQUETAS']]) {
+    const re = new RegExp(`^\\s*${decl}\\s+${nombre}\\s*=`, 'gm')
+    assert.equal((js.match(re) ?? []).length, 1,
+      `${decl} ${nombre} tiene que declararse exactamente una vez`)
   }
 
   // Y la llamada de arranque, una sola: dos `cargarLista()` sueltos al final
@@ -798,4 +858,130 @@ test('UI-46 · ⭐ la pregunta al cliente se puede decir en voz alta', async () 
     assert.ok(!/titular\.|documentos\[|_/.test(q.pregunta),
       `la ruta del esquema se coló en la pregunta: «${q.pregunta}»`)
   }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-8 · El documento resaltado — que se pueda LEER y que no MIENTA
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-47 · ⭐ el script de la página PARSEA', async () => {
+  // ── EL TEST QUE HABRÍA AHORRADO LA ÚLTIMA MEDIA HORA ──────────────────────
+  //
+  // Al añadir la leyenda del documento metí un comentario HTML con acentos
+  // graves DENTRO de una plantilla de JavaScript. La página dejó de parsear
+  // entera —ni un botón respondía— y las 46 pruebas de esta suite siguieron
+  // verdes, porque comprueban el CONTRATO con el navegador y no que el
+  // navegador pueda ejecutar lo que recibe.
+  //
+  // Es el mismo agujero que dejó pasar las sesenta líneas duplicadas: nadie
+  // miraba `ui/`. Aquí nadie ejecutaba lo que `ui/` sirve.
+  //
+  // Un `new Function` no ejecuta el cuerpo: solo obliga a compilarlo. Es
+  // exactamente lo que hace el navegador antes de correr nada.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+  assert.ok(js.length > 1000, 'el script no llegó entero')
+  assert.doesNotThrow(() => new Function(js), 'el script de la página no compila')
+})
+
+test('UI-48 · ⭐ el documento se enseña TAL CUAL, no normalizado', async () => {
+  // Se pintaba el texto normalizado: sin mayúsculas, sin tildes y sin guiones.
+  // Era exacto y era inservible — «juan perez gonzalez cedula 8 123 456» no se
+  // parece al papel que el gerente tiene delante, y esta tarjeta existe para
+  // que lo reconozca.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+
+  // Se prueba la función REAL, extraída del HTML servido. Ver `funcionesDe`.
+  const { resaltar, normalizar, normalizarConMapa } =
+    funcionesDe(js, ['esc', 'ETIQUETAS', 'etiquetaDe', 'normalizar', 'normalizarConMapa', 'resaltar'])
+
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-001`)).json()
+  const pintado = resaltar(d.expediente)
+  const crudo = (d.expediente.fuentes || []).map(f => f.texto).join('\n')
+
+  assert.ok(/[A-ZÁÉÍÓÚÑ]/.test(pintado), 'el documento sale sin una sola mayúscula: está normalizado')
+  assert.ok(/[áéíóúñÁÉÍÓÚÑ]/.test(crudo) ? /[áéíóúñÁÉÍÓÚÑ]/.test(pintado) : true,
+    'la fuente tiene tildes y el documento pintado las perdió')
+
+  // Y el mapa reconstruye EXACTAMENTE lo que devuelve la función canónica.
+  const mapa = normalizarConMapa(crudo)
+  assert.notEqual(mapa, null, 'el mapa de posiciones no se pudo construir')
+  assert.equal(mapa.texto, normalizar(crudo), 'el mapa reconstruye un texto distinto')
+})
+
+test('UI-49 · ⭐ cada subrayado señala EXACTAMENTE su cita, no la de al lado', async () => {
+  // ── EL INVARIANTE QUE HACE CONFIABLE EL RESALTADO ─────────────────────────
+  //
+  // Un mapa de posiciones desplazado no revienta: subraya la palabra de al lado
+  // con total aplomo. Sería el peor fallo posible en la única tarjeta cuyo
+  // trabajo es demostrar procedencia, y mirándola no se notaría.
+  //
+  // Así que se comprueba el lazo entero: se toma lo que la página REALMENTE
+  // pinta dentro de cada <mark>, se normaliza, y tiene que ser idéntico a la
+  // cita normalizada de ese campo. Si el mapa se desplaza un solo carácter,
+  // esto se pone rojo.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+  const { resaltar, normalizar } =
+    funcionesDe(js, ['esc', 'ETIQUETAS', 'etiquetaDe', 'normalizar', 'normalizarConMapa', 'resaltar'])
+
+  const lista = await (await fetch(`${BASE}/api/expedientes`)).json()
+  let comprobados = 0
+
+  for (const { id } of lista.expedientes) {
+    const d = await (await fetch(`${BASE}/api/expediente/${id}`)).json()
+    const e = d.expediente
+    if (!(e.fuentes || []).length) continue
+
+    const pintado = resaltar(e)
+    // Se leen los <mark> del HTML que se pinta de verdad, con su data-ruta.
+    const marcas = [...pintado.matchAll(/<mark class="ev-[^"]*" data-ruta="([^"]*)"[^>]*>([\s\S]*?)<\/mark>/g)]
+
+    for (const [, ruta, dentro] of marcas) {
+      const campo = e.campos[ruta]
+      assert.ok(campo, `${id}: se subrayó ${ruta} y no hay tal campo`)
+      // El texto pintado lleva entidades HTML; se deshacen antes de comparar,
+      // porque comparar `&amp;` con `&` sería comparar el escapado, no el dato.
+      const limpio = dentro.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+      assert.equal(normalizar(limpio), normalizar(campo.cita),
+        `${id} · ${ruta}: el subrayado no coincide con la cita del campo`)
+      comprobados++
+    }
+  }
+  // Un test que no comprueba nada pasa igual. Se exige que haya mirado algo.
+  assert.ok(comprobados >= 5, `solo se comprobaron ${comprobados} subrayados`)
+})
+
+test('UI-50 · el servidor manda el nombre del campo en español, no la ruta', async () => {
+  // La pantalla decía `titular.cedula` en la tabla de campos, en los conflictos
+  // y al pasar por encima del documento. La tabla que traduce eso ya existe en
+  // core/calidad.mjs —la usan las preguntas—, así que se manda desde allí en vez
+  // de copiarla al navegador: dos listas de lo mismo acaban separándose, y aquí
+  // la divergencia se habría leído como que el sistema habla así.
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-001`)).json()
+  assert.ok(d.etiquetas, 'no llegan las etiquetas')
+  assert.equal(d.etiquetas['titular.cedula'], 'la cédula')
+
+  // Todo campo que entró tiene la suya: si falta una, la pantalla cae a la ruta
+  // y vuelve a hablar en JSON sin que nadie se entere.
+  for (const ruta of Object.keys(d.expediente.campos)) {
+    assert.ok(d.etiquetas[ruta], `falta la etiqueta de ${ruta}`)
+    assert.notEqual(d.etiquetas[ruta], ruta, `${ruta} no está traducida`)
+  }
+})
+
+test('UI-51 · el subrayado se puede tocar y tabular, no solo señalar con el ratón', async () => {
+  // El nombre del campo vivía en el `title`, o sea detrás de un hover. En el
+  // celular del gerente —el aparato desde el que se aprueba— no hay hover, así
+  // que ese dato sencillamente no existía allí.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+
+  assert.match(js, /function cablearDocumento/, 'no existe el cableado del documento')
+  assert.match(js, /cablearDocumento\(\)/, 'se declara pero no se llama: detectar sin actuar')
+  assert.match(js, /marca\.tabIndex = 0/, 'el subrayado no recibe foco de teclado')
+  assert.match(js, /key === 'Enter'/, 'no responde a Enter')
+  assert.match(js, /leyenda-fuente/, 'no hay leyenda donde leerlo sin ratón')
 })

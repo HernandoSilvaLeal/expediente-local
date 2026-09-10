@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/verificar-invariantes.mjs — O1..O5 comprobados sobre los datos REALES.
+// scripts/verificar-invariantes.mjs — O1..O6 comprobados sobre los datos REALES.
 //
 // ═══════════════════════════════════════════════════════════════════════════
 //   Los tests prueban el código con datos de test.
@@ -31,7 +31,7 @@ import { cargarEsquema } from '../core/esquema.mjs'
 import { leer as leerLedger, verificarCadena, EVENTO } from '../core/ledger.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
 import { TRANSICIONES, SOLO_HUMANO, ORIGENES, esLegal } from '../core/estado.mjs'
-import { anclar, nivelEvidencia } from '../core/anclaje.mjs'
+import { anclar, nivelEvidencia, normalizar } from '../core/anclaje.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const V = '\x1b[0;32m', R = '\x1b[0;31m', A = '\x1b[0;33m'
@@ -185,6 +185,49 @@ export const INVARIANTES = Object.freeze([
         return [{ donde: `hecho #${cadena.rotoEn}`, causaRaiz: cadena.causa }]
       }
       return []
+    }
+  },
+  {
+    id: 'O6',
+    dice: 'la POSICIÓN guardada de cada campo señala su propia cita, y no la de otro',
+    porque: 'una posición desplazada no falla: subraya la palabra de al lado con total aplomo, y es lo que ve el supervisor',
+    comprobar ({ eventos, expediente }) {
+      // ── DE DÓNDE SALE ESTE INVARIANTE ────────────────────────────────────
+      //
+      // Al resolver un conflicto, la proyección cambiaba `valor` y `cita` y
+      // heredaba el `donde` del valor DESCARTADO. En EXP-003 el campo decía
+      // «María Gómez Batista» con la posición de «Juan Pérez González»: los dos
+      // de 33 caracteres, así que ni la longitud lo delataba.
+      //
+      // O1 no lo veía, y tenía razón en no verlo: la cita SÍ existía en la
+      // fuente. Lo que estaba roto era el vínculo entre la cita y su posición,
+      // que hasta ahora no comprobaba nadie. El efecto era que el documento
+      // resaltado subrayaba el nombre que el oficial acababa de descartar, el
+      // CSV exportaba ese desde/hasta y la constancia se lo llevaba al
+      // supervisor — en el expediente del conflicto, que es el que se enseña.
+      //
+      // Lo encontró una prueba de la interfaz, no esta suite. Por eso existe
+      // ahora aquí: lo que se descubre mirando tiene que quedar comprobado por
+      // comando, o se descubre otra vez.
+      const fuente = expediente.fuentes.map(f => f.texto).join('\n')
+      const norm = normalizar(fuente)
+      const malos = []
+      for (const [ruta, c] of Object.entries(expediente.campos)) {
+        if (!c.cita || !c.donde) continue
+        const { desde, hasta } = c.donde
+        if (!(Number.isInteger(desde) && Number.isInteger(hasta) && desde >= 0 && hasta <= norm.length && desde < hasta)) {
+          malos.push({ donde: ruta, causaRaiz: `la posición ${desde}-${hasta} no cabe en la fuente (${norm.length})` })
+          continue
+        }
+        const enEsePunto = norm.slice(desde, hasta)
+        if (enEsePunto !== normalizar(c.cita)) {
+          malos.push({
+            donde: ruta,
+            causaRaiz: `la posición ${desde}-${hasta} señala «${enEsePunto}» y la cita del campo es «${normalizar(c.cita)}»`
+          })
+        }
+      }
+      return malos
     }
   }
 ])

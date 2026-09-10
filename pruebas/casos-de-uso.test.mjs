@@ -30,6 +30,7 @@ import { calidad } from '../core/calidad.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
 import { FUENTE_ART18, expedienteArt18, titularArt18, operacionArt18, documentoArt18 } from './fixtures.mjs'
 import { RECHAZO } from '../core/guardias.mjs'
+import { normalizar } from '../core/anclaje.mjs'
 import { revisarDominio } from '../instancias/banca/guardias.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
@@ -927,6 +928,23 @@ test('CU-25 · ⭐ una persona zanja el conflicto, y solo entonces se puede firm
     assert.equal(tras.campos['titular.nombre'].valor, 'María Gómez Batista')
     assert.equal(tras.campos['titular.nombre'].cita, 'el titular es María Gómez Batista',
       'el valor viaja con la cita de SU documento, no con la del que desplazó')
+
+    // ── Y LA POSICIÓN VIAJA CON LA CITA ────────────────────────────────────
+    //
+    // Esta línea faltaba, y el fallo que dejó pasar duró hasta que se enseñó el
+    // documento resaltado en pantalla: `donde` se heredaba del valor DESCARTADO.
+    // El campo decía «María Gómez Batista» y la posición señalaba «Juan Pérez
+    // González» —los dos de 33 caracteres, así que ni la longitud lo delataba—.
+    //
+    // El test de arriba comprobaba la cita y daba por hecho que lo demás la
+    // seguía. La regla que queda: donde se comprueba una mitad de un dato
+    // partido en dos, se comprueban las dos.
+    const donde = tras.campos['titular.nombre'].donde
+    assert.ok(donde, 'un campo asentado con cita tiene que saber DÓNDE está')
+    const fuenteEntera = normalizar(tras.fuentes.map(f => f.texto).join('\n'))
+    assert.equal(fuenteEntera.slice(donde.desde, donde.hasta),
+      normalizar('el titular es María Gómez Batista'),
+      'la posición señala el nombre que se descartó, no el que se eligió')
 
     // La evidencia BAJA: una decisión humana entre dos documentos es un dato
     // bien fundado, no un dato mejor probado.

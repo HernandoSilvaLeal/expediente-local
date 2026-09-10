@@ -410,7 +410,7 @@ function definirPuertas (m) {
         auto('core/dedup.mjs', hay('core/dedup.mjs')),
         auto('core/calidad.mjs', hay('core/calidad.mjs')),
         auto('core/proyeccion.mjs', hay('core/proyeccion.mjs')),
-        auto('verificar-invariantes O1..O5', hay('scripts/verificar-invariantes.mjs')),
+        auto('verificar-invariantes O1..O6', hay('scripts/verificar-invariantes.mjs')),
         auto('UI servida por node:http', hay('ui/servidor.mjs')),
         auto('los 4 badges de evidencia', hay('ui/index.html')),
         decl('los 13 casos oficiales, número CRUDO publicado', 'plata_casos_crudo', 'npm run audit:casos'),

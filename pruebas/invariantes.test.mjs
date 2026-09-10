@@ -94,10 +94,10 @@ test('T15-00 · un expediente sano cumple LOS CINCO', () => {
   } finally { b.limpiar() }
 })
 
-test('T15-01 · hay exactamente cinco invariantes, y cada uno dice qué y por qué', () => {
-  assert.equal(INVARIANTES.length, 5)
+test('T15-01 · hay exactamente seis invariantes, y cada uno dice qué y por qué', () => {
+  assert.equal(INVARIANTES.length, 6)
   for (const inv of INVARIANTES) {
-    assert.match(inv.id, /^O[1-5]$/)
+    assert.match(inv.id, /^O[1-6]$/)
     assert.ok(inv.dice.length > 20, `${inv.id} no dice qué comprueba`)
     assert.ok(inv.porque.length > 30,
       `${inv.id} no explica por qué existe: un invariante sin motivo nadie se atreve a quitarlo ni a arreglarlo`)
@@ -299,6 +299,100 @@ test('T15-O5 · BORRAR un hecho del medio lo pone en rojo', () => {
     const v = verificar(b.dir, ESQ).violaciones.filter(x => x.invariante === 'O5')
     assert.ok(v.length, 'quitar un hecho rompe la cadena')
     assert.match(v[0].causaRaiz, /falta un evento|no engancha|no se puede ni leer/)
+  } finally { b.limpiar() }
+})
+
+test('T15-O6 · ⭐ una POSICIÓN que señala otra frase lo pone en rojo', () => {
+  // ── EL FALLO REAL QUE HIZO NACER ESTE INVARIANTE ─────────────────────────
+  //
+  // Al resolver un conflicto, la proyección cambiaba `valor` y `cita` y heredaba
+  // el `donde` del valor DESCARTADO. En EXP-003 el campo decía «María Gómez
+  // Batista» con la posición de «Juan Pérez González» —los dos de 33
+  // caracteres, así que ni la longitud lo delataba—.
+  //
+  // O1 pasaba, y con razón: la cita SÍ existía en la fuente. Lo roto era el
+  // vínculo entre la cita y su posición, que no comprobaba nadie. Y es
+  // exactamente lo que se enseña en pantalla: el documento resaltado subrayaba
+  // el nombre que el oficial acababa de descartar.
+  //
+  // Se alimenta la comprobación DIRECTAMENTE con una proyección desplazada,
+  // por la razón que explica el test de al lado: el `donde` no se puede
+  // corromper desde el disco.
+  const O6 = INVARIANTES.find(i => i.id === 'O6')
+  const b = sano()
+  try {
+    const eventos = lineas(b.archivo).map(l => JSON.parse(l))
+    const expediente = proyectar(eventos)
+    const ruta = Object.keys(expediente.campos).find(r => expediente.campos[r].donde)
+    assert.ok(ruta, 'el andamio necesita al menos un campo con posición')
+
+    const campo = expediente.campos[ruta]
+    const desplazado = {
+      ...expediente,
+      campos: {
+        ...expediente.campos,
+        [ruta]: { ...campo, donde: { desde: campo.donde.desde + 4, hasta: campo.donde.hasta + 4 } }
+      }
+    }
+    const malos = O6.comprobar({ eventos, expediente: desplazado })
+    assert.ok(malos.length, 'cuatro caracteres de desfase tienen que salir en rojo')
+    assert.match(malos[0].causaRaiz, /señala/,
+      'la causa raíz tiene que enseñar QUÉ señala y QUÉ debería señalar')
+  } finally { b.limpiar() }
+})
+
+test('T15-O6b · ⭐ una posición fuera de rango se caza y se nombra, no revienta', () => {
+  // El otro modo de fallo del mapeo: en vez de señalar mal, señalar fuera.
+  // `String.slice` no lanza con índices absurdos —devuelve cadena vacía—, así
+  // que sin una comprobación explícita esto pasaría como «no coincide» y la
+  // causa raíz mentiría sobre lo que de verdad ocurrió.
+  const O6 = INVARIANTES.find(i => i.id === 'O6')
+  const b = sano()
+  try {
+    const eventos = lineas(b.archivo).map(l => JSON.parse(l))
+    const expediente = proyectar(eventos)
+    const ruta = Object.keys(expediente.campos).find(r => expediente.campos[r].donde)
+    const roto = {
+      ...expediente,
+      campos: { ...expediente.campos,
+                [ruta]: { ...expediente.campos[ruta], donde: { desde: 999999, hasta: 1000000 } } }
+    }
+    const malos = O6.comprobar({ eventos, expediente: roto })
+    assert.ok(malos.length, 'una posición imposible no puede pasar en verde')
+    assert.match(malos[0].causaRaiz, /no cabe en la fuente/,
+      'tiene que decir que está FUERA, no que «no coincide»')
+  } finally { b.limpiar() }
+})
+
+test('T15-O6-meta · O6 vigila la proyección, no el disco — y hay que decirlo', () => {
+  // Igual que O3, y por la misma razón: `core/proyeccion.mjs` RECALCULA `donde`
+  // a partir de la cita cada vez que proyecta. Así que no hay forma de dejar un
+  // `desde/hasta` corrupto editando el archivo: la proyección lo pisa.
+  //
+  // Eso no hace a O6 decorativo, hace que sea de otra clase — una red contra
+  // NUESTRO propio código, no contra alguien que edite el ledger. Y cazó un
+  // fallo real el primer día que existió.
+  //
+  // Se escribe porque un jurado que pregunte «¿cómo provocas cada invariante?»
+  // merece esta respuesta y no un silencio incómodo.
+  const b = sano()
+  try {
+    const ls = lineas(b.archivo)
+    const i = ls.findIndex(l => l.includes('"REVISION"'))
+    const ev = JSON.parse(ls[i])
+    const campo = ev.datos.campos.find(c => c.ruta === 'titular.nombre')
+    campo.donde = { desde: 0, hasta: 3 }        // basura deliberada en el disco
+    ls[i] = JSON.stringify(ev)
+    escribir(b.archivo, ls)
+
+    const eventos = lineas(b.archivo).map(l => JSON.parse(l))
+    const proyectado = proyectar(eventos).campos['titular.nombre'].donde
+    assert.notDeepEqual(proyectado, { desde: 0, hasta: 3 },
+      'la proyección tiene que recalcular la posición, no confiar en la del ledger')
+
+    const v = verificar(b.dir, ESQ).violaciones.filter(x => x.invariante === 'O6')
+    assert.equal(v.length, 0,
+      'corromper el `donde` del ledger NO alcanza a O6: lo recalcula la proyección')
   } finally { b.limpiar() }
 })
 

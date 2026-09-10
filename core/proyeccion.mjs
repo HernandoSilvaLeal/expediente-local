@@ -181,6 +181,22 @@ function aplicar (exp, e) {
         ...campo,
         valor: conflicto.propuesto,
         cita: conflicto.citaPropuesta,
+        // ── LA POSICIÓN VIAJA CON LA CITA. SIEMPRE ─────────────────────────
+        //
+        // Esto era `...campo` y nada más: se cambiaban `valor` y `cita` y se
+        // heredaba el `donde` del valor DESCARTADO. El campo quedaba diciendo
+        // «María Gómez Batista» con la posición de «Juan Pérez González» —los
+        // dos de 33 caracteres, así que ni siquiera se notaba por la longitud.
+        //
+        // Lo que eso rompe es justo lo que este proyecto vende: el documento
+        // resaltado subrayaba el nombre que el oficial ACABABA DE DESCARTAR, el
+        // CSV exportaba ese desde/hasta, y la constancia se lo llevaba al
+        // supervisor. En el expediente del conflicto, que es el que se enseña.
+        //
+        // Es el mismo patrón de siempre —el mismo dato guardado en dos sitios y
+        // uno actualizado— y van tres. La regla que queda: `cita` y `donde` no
+        // se escriben por separado nunca; donde cambia una, se recalcula la otra.
+        donde: ubicarCita(conflicto.citaPropuesta ?? '', fuenteDe(exp)) ?? null,
         evidencia: 'Reportado',
         seq: e.seq
       }))

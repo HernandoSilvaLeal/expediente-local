@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url'
 
 import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente, aCsv, constancia } from '../core/expediente.mjs'
-import { calidad, preguntasPendientes } from '../core/calidad.mjs'
+import { calidad, preguntasPendientes, comoSeDice } from '../core/calidad.mjs'
 import { agrupar } from '../core/dedup.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
 import { leer as leerLedger, verificarCadena } from '../core/ledger.mjs'
@@ -178,7 +178,24 @@ const servidor = createServer(async (req, res) => {
         cadena: verificarCadena(eventos),
         hechos: eventos.map(h => ({ seq: h.seq, ts: h.ts, tipo: h.tipo, origen: h.origen, motivo: h.motivo })),
         csv: aCsv(e),
-        constancia: constancia(e, esquema)
+        constancia: constancia(e, esquema),
+        // ── EL NOMBRE DEL CAMPO EN ESPAÑOL, DESDE UNA SOLA TABLA ───────────
+        //
+        // La pantalla enseñaba `titular.cedula` en la tabla de campos, en los
+        // conflictos y al pasar por encima del documento resaltado. Es nuestra
+        // estructura de datos asomando: el gerente que tiene que reconocer su
+        // propio expediente lee el nombre de una clave JSON.
+        //
+        // Se manda desde aquí y no se traduce en el navegador, porque la tabla
+        // ya existe en core/calidad.mjs —la usan las preguntas— y una segunda
+        // copia en `ui/` se habría separado sin que se notara: la pregunta
+        // diría «la cédula» y la fila de al lado `titular.cedula`, en la misma
+        // pantalla, y eso no se lee como un fallo sino como que el sistema
+        // habla así.
+        etiquetas: Object.fromEntries(
+          Object.values(e.campos ?? {}).map(c => [c.ruta, comoSeDice(c.ruta)])
+            .concat((e.conflictos ?? []).map(c => [c.ruta, comoSeDice(c.ruta)]))
+            .concat((e.resoluciones ?? []).map(r => [r.ruta, comoSeDice(r.ruta)])))
       })
     }
 

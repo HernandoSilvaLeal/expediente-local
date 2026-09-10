@@ -30,6 +30,7 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { LISTA_NEGRA, AUTOEXCLUIDOS } from './lista-negra.mjs'
 import { contarFrontera } from './frontera.mjs'
+import { INVARIANTES } from './verificar-invariantes.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const rel = (p) => relative(RAIZ, p)
@@ -240,6 +241,46 @@ puerta('la definición del problema sigue describiendo el sistema', () => {
 
   return { ok: malos.length === 0, detalle: malos.join(' · ') }
 }, 'un documento que explica el problema con números viejos es marketing con aspecto de análisis')
+
+puerta('el README publica las cifras que dan los comandos', () => {
+  // ── LAS CIFRAS DEL README SE QUEDARON VIEJAS, OTRA VEZ ───────────────────
+  //
+  // El README abre su tabla diciendo «medidos al ejecutar `npm run metricas`,
+  // no escritos a mano». Y estaban escritos a mano: decía 370 tests cuando eran
+  // 390, 13 puertas cuando eran 16, y 5 invariantes cuando eran 6.
+  //
+  // Es el mismo fallo que `audit/entrega.json` publicando 12/12 mientras el
+  // comando decía NO SE ENTREGA, y por la misma causa exacta: NADA obligaba a
+  // que coincidieran. Un número que solo se actualiza si alguien se acuerda es
+  // un número que va a estar mal el día que lo lea el jurado.
+  //
+  // Se comparan los que se pueden saber sin pagar el coste de la suite entera:
+  // las puertas y los invariantes salen de este proceso, y los tests de
+  // `audit/tests.json`, que la puerta de al lado ya obliga a mantener fresco.
+  const readme = join(RAIZ, 'README.md')
+  if (!existsSync(readme)) return { ok: false, detalle: 'no existe README.md' }
+  // Sin el marcado: en Markdown el número va en negrita y los asteriscos se
+  // meten entre la cifra y la palabra que la nombra. Buscar sobre el texto
+  // crudo daba cero coincidencias y la puerta habría pasado sin mirar nada.
+  const texto = readFileSync(readme, 'utf8').replace(/[*_`]/g, '')
+
+  const malos = []
+  const comparar = (patron, real, que) => {
+    const m = patron.exec(texto)
+    if (!m) { malos.push(`el README ya no dice cuántos ${que} hay`); return }
+    if (Number(m[1]) !== real) malos.push(`dice ${m[1]} ${que} y son ${real}`)
+  }
+
+  comparar(/(\d+)\s+puertas,\s*cada una eliminatoria/i, puertas.length, 'puertas')
+  comparar(/(\d+)\s*\/\s*\d+\s+invariantes/i, INVARIANTES.length, 'invariantes')
+
+  try {
+    const t = JSON.parse(readFileSync(join(RAIZ, 'audit/tests.json'), 'utf8'))
+    comparar(/(\d+)\s+tests en poco/i, t.tests.total, 'tests')
+  } catch { malos.push('no se pudo leer audit/tests.json para comparar los tests') }
+
+  return { ok: malos.length === 0, detalle: malos.join(' · ') }
+}, 'el README dice que sus números salen de un comando: si no coinciden, esa frase es lo primero que se cae')
 
 puerta('la declaración de base preexistente está COMPLETA', () => {
   // ── LO QUE ESTA PUERTA IMPIDE, Y ES ELIMINATORIO ─────────────────────────

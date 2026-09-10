@@ -122,7 +122,13 @@ table{width:100%; border-collapse:collapse; font-size:14px}
 th{text-align:left; color:var(--apagado); font-weight:600; font-size:11px;
    text-transform:uppercase; letter-spacing:.8px; padding:0 8px 8px 0}
 td{padding:7px 8px 7px 0; border-top:1px solid var(--linea); vertical-align:top}
-td.ruta{color:var(--tenue); white-space:nowrap; width:1%}
+/* ── LA COLUMNA HABLA DOS IDIOMAS A LA VEZ ──────────────────────────────────
+   Arriba, el nombre del campo como se dice en una sucursal: es lo que lee el
+   gerente que tiene que reconocer su expediente. Debajo, en gris y pequeño, la
+   ruta del esquema: es lo que copia el técnico que va a replicar esto.
+   Antes solo estaba la segunda, y la pantalla entera hablaba en JSON. */
+td.ruta{color:var(--texto); width:1%; min-width:150px}
+td.ruta .codigo{display:block; margin:2px 0 0; white-space:nowrap}
 .cita{color:var(--apagado); font-size:12.5px; font-style:italic; margin-top:3px}
 
 /* El badge lleva SIEMPRE forma + color + texto. Nunca solo color. */
@@ -170,6 +176,19 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
   background:transparent; padding:1px 0 2px; border-bottom:2px solid currentColor;
   color:var(--texto); cursor:help;
 }
+/* El subrayado tiene que poder tocarse con el dedo, no solo señalarse con el
+   ratón: el dispositivo desde el que se aprueba es un teléfono. */
+.fuente mark{scroll-margin-top:80px}
+.fuente mark:focus{outline:2px solid var(--mint); outline-offset:2px}
+.fuente mark[aria-current="true"]{background:rgba(45,212,191,.14); color:var(--texto)}
+
+/* La leyenda de debajo del documento: dice qué campo es el subrayado que se
+   acaba de tocar. Es la única forma de que ese dato exista en un móvil. */
+.leyenda{margin-top:10px; min-height:34px; font-size:12.5px; color:var(--tenue);
+         border-top:1px solid var(--linea); padding-top:9px; line-height:1.5}
+.leyenda .apunta{color:var(--apagado); font-style:italic}
+.leyenda b{color:var(--texto)}
+
 .fuente mark.ev-Confirmado{border-color:var(--ev-confirmado)}
 .fuente mark.ev-Reportado{border-color:var(--ev-reportado)}
 .fuente mark.ev-Estimado{border-color:var(--ev-estimado)}
@@ -535,11 +554,32 @@ function reparto (porEvidencia) {
   }).join('') + '</div>'
 }
 
+/**
+ * El nombre del campo tal y como se dice en una sucursal.
+ *
+ * NO hay tabla aquí. La única que existe vive en `core/calidad.mjs` —la misma
+ * que redacta las preguntas— y llega con cada expediente. Tener una copia en
+ * esta pantalla habría hecho que la pregunta dijera «la cédula» y la fila de al
+ * lado `titular.cedula`, en el mismo sitio y sin que nadie lo leyera como un
+ * fallo.
+ *
+ * Si un campo no está traducido se enseña su ruta, que es fea a propósito: se
+ * ve de un vistazo qué falta por traducir.
+ */
+let ETIQUETAS = {}
+function etiquetaDe (ruta) {
+  return ETIQUETAS[ruta] || ETIQUETAS[String(ruta).replace(/\[\d+\]/, '[]')] || ruta
+}
+
 async function abrirExpediente (id) {
   for (const el of document.querySelectorAll('.exp')) {
     el.setAttribute('aria-current', String(el.dataset.id === id))
   }
   const d = await (await fetch('/api/expediente/' + encodeURIComponent(id))).json()
+  // Las manda el servidor desde la misma tabla que redacta las preguntas. Se
+  // guardan aquí, en el módulo, en vez de pasarlas por cinco funciones: el
+  // documento resaltado se pinta desde `resaltar()`, que no recibe el detalle.
+  ETIQUETAS = d.etiquetas || {}
   // `criticos` llega en /api/expedientes y también se ignoraba. Un campo que la
   // norma exige no es igual que uno opcional, y la pantalla debería decirlo.
   const criticos = new Set(ESQUEMA.criticos ?? [])
@@ -570,7 +610,8 @@ async function abrirExpediente (id) {
         <tr><th>Campo</th><th>Valor</th><th>Evidencia</th></tr>
         ${campos.map(([ruta, c]) => `
           <tr>
-            <td class="ruta mono">${esc(ruta)}${esCritico(ruta) ? '<span class="critico" title="lo exige el Acuerdo 1-2026">·</span>' : ''}</td>
+            <td class="ruta">${esc(etiquetaDe(ruta))}${esCritico(ruta) ? '<span class="critico" title="lo exige el Acuerdo 1-2026">·</span>' : ''}
+              <span class="codigo">${esc(ruta)}</span></td>
             <td><b>${esc(c.valor)}</b>${c.cita ? `<div class="cita">«${esc(c.cita)}»</div>` : ''}</td>
             <td><span class="ev ev-${esc(c.evidencia)}">${esc(c.evidencia)}</span></td>
           </tr>`).join('')}
@@ -583,7 +624,7 @@ async function abrirExpediente (id) {
       <table>
         ${huecos.map(([ruta, h]) => `
           <tr>
-            <td class="ruta mono">${esc(ruta)}</td>
+            <td class="ruta">${esc(etiquetaDe(ruta))}<span class="codigo">${esc(ruta)}</span></td>
             <td>${h.guardias.map(g => `<span class="guardia" title="${esc(g)}">${esc(enHumano(g, GUARDIA_HUMANA))}</span>`).join('')}
                 <span class="motivo">${esc(h.motivos.join(', '))}</span></td>
           </tr>`).join('')}
@@ -632,7 +673,7 @@ async function abrirExpediente (id) {
       </p>
       ${e.conflictos.map((c, i) => `
         <div class="conflicto" data-ruta="${esc(c.ruta)}">
-          <div class="ruta mono" style="margin-bottom:8px">${esc(c.ruta)}</div>
+          <div style="margin-bottom:8px"><b>${esc(etiquetaDe(c.ruta))}</b><span class="codigo">${esc(c.ruta)}</span></div>
           ${[[c.asentado, c.citaAsentada, 'ya asentado'], [c.propuesto, c.citaPropuesta, 'la otra fuente']]
             .map(([v, cita, etiq], j) => `
             <label class="opcion">
@@ -653,7 +694,7 @@ async function abrirExpediente (id) {
       <table>
         ${e.resoluciones.map(r => `
           <tr>
-            <td class="ruta mono">${esc(r.ruta)}</td>
+            <td class="ruta">${esc(etiquetaDe(r.ruta))}<span class="codigo">${esc(r.ruta)}</span></td>
             <td><b>${esc(r.valor)}</b>
               <div class="motivo">descartado: ${esc(r.descartado)} · ${esc(r.oficial || '—')}</div>
               <div class="cita">«${esc(r.motivo || '')}»</div></td>
@@ -666,7 +707,7 @@ async function abrirExpediente (id) {
       <p class="aviso" style="padding-top:0">lo decide una regla sobre el esquema. Cero IA</p>
       ${d.preguntas.slice(0, 4).map(p => `
         <div class="pregunta">
-          <b>${esc(p.critico ? 'CRÍTICO' : 'opcional')} · ${esc(p.ruta)}</b>
+          <b>${esc(p.critico ? 'CRÍTICO' : 'opcional')} · ${esc(etiquetaDe(p.ruta))}</b><span class="codigo">${esc(p.ruta)}</span>
           <div>${esc(p.pregunta)}</div>
           <div class="motivo">${esc(p.detalle)}</div>
         </div>`).join('')}
@@ -688,10 +729,15 @@ async function abrirExpediente (id) {
     ${(e.fuentes || []).length ? `<div class="tarjeta">
       <h2>El documento, y qué se sacó de dónde</h2>
       <p class="aviso" style="padding-top:0">
-        cada trozo resaltado es un campo del expediente. Lo que no está
-        resaltado, no entró — y eso también se puede mirar.
+        Este es el texto <b>tal y como se recibió</b>. Cada trozo subrayado es un
+        campo del expediente; el color dice cuánto lo respalda la fuente.
+        <b>Toca uno</b> para ver cuál es. Lo que no está subrayado no entró — y
+        eso también se puede mirar.
       </p>
       <div class="fuente">${resaltar(e)}</div>
+      <div class="leyenda" id="leyenda-fuente">
+        <span class="apunta">toca un subrayado y aquí se dice qué campo es</span>
+      </div>
     </div>` : ''}
 
     ${d.constancia ? `<div class="tarjeta">
@@ -734,6 +780,7 @@ async function abrirExpediente (id) {
 
   cablearConflictos(e.id)
   cablearFirma(e.id)
+  cablearDocumento()
   cablearCopiar()
 }
 
@@ -831,6 +878,59 @@ function cablearFirma (id) {
 // y lo que este código hace con un error es ENSEÑARLO, no anticiparlo: si la
 // interfaz validara por su cuenta, tarde o temprano diría algo distinto que el
 // núcleo, y la que manda es la del núcleo.
+/**
+ * El documento resaltado deja de ser un adorno y pasa a poder interrogarse.
+ *
+ * ── QUÉ ESTABA MAL ────────────────────────────────────────────────────────
+ *
+ * El nombre del campo vivía en el `title` del subrayado. Eso son tres
+ * problemas encima del mismo dato:
+ *
+ *   · en un teléfono NO EXISTE, porque no hay `hover` — y el teléfono es
+ *     justo el dispositivo desde el que se aprueba;
+ *   · con el teclado tampoco, porque un `<mark>` no recibe foco;
+ *   · y decía `titular.cedula`, que no es el nombre de nada para quien firma.
+ *
+ * Ahora cada subrayado se puede tocar, tabular y pulsar con Enter, y lo que
+ * dice va a la leyenda de debajo, en español. La tarjeta pasa de «mira, hay
+ * colores» a «pregúntale de dónde salió cada cosa».
+ */
+function cablearDocumento () {
+  const leyenda = $('#leyenda-fuente')
+  const marcas = document.querySelectorAll('.fuente mark[data-ruta]')
+  if (!leyenda || !marcas.length) return
+
+  const contar = {}
+  for (const m of marcas) contar[m.dataset.ruta] = (contar[m.dataset.ruta] ?? 0) + 1
+
+  const señalar = (marca) => {
+    for (const otra of marcas) otra.setAttribute('aria-current', String(otra === marca))
+    const ruta = marca.dataset.ruta
+    leyenda.innerHTML =
+      `<span class="ev ev-${esc(marca.className.replace('ev-', ''))}"></span>` +
+      `<b>${esc(etiquetaDe(ruta))}</b> · ${esc(marca.textContent)} ` +
+      `<span class="codigo">${esc(ruta)}</span>` +
+      // El grado de evidencia va en palabra, no solo en color: quien no
+      // distingue los cuatro tonos —o mira en una sala mal proyectada— tiene
+      // que poder leerlo igual.
+      `<div class="motivo">respaldo: ${esc(marca.className.replace('ev-', ''))}` +
+      (contar[ruta] > 1 ? ` · aparece ${contar[ruta]} veces en el documento` : '') + '</div>'
+  }
+
+  for (const marca of marcas) {
+    // `tabindex` y `role` se ponen aquí y no en el HTML generado: si algún día
+    // este cableado no corre, el documento se sigue leyendo entero y no queda
+    // un elemento que anuncia ser un botón y no responde. Prometer un control
+    // que no funciona es peor que no ofrecerlo.
+    marca.tabIndex = 0
+    marca.setAttribute('role', 'button')
+    marca.addEventListener('click', () => señalar(marca))
+    marca.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); señalar(marca) }
+    })
+  }
+}
+
 function cablearConflictos (id) {
   for (const caja of document.querySelectorAll('.conflicto')) {
     const boton = caja.querySelector('.btn')
@@ -887,14 +987,41 @@ function cablearConflictos (id) {
  * nada: el trozo pintado ES el que el código encontró con indexOf, en la
  * posición que guardó al anclarlo.
  *
- * Se pinta sobre el texto NORMALIZADO porque es sobre el que se midió. Enseñar
- * el original con posiciones del normalizado desplazaría los resaltados — es el
- * mismo desfase que ya rompió una vez la ventana de contexto, y aquí se vería.
+ * ── POR QUÉ SE ENSEÑA EL ORIGINAL Y NO EL NORMALIZADO ──────────────────────
+ *
+ * Antes se pintaba sobre el texto normalizado, porque es sobre el que se
+ * midieron las posiciones. Era correcto y era inservible: el gerente veía
+ *
+ *     el titular es juan perez gonzalez cedula 8 123 456
+ *
+ * en vez de «El titular es Juan Pérez González, cédula 8-123-456». Sin
+ * mayúsculas, sin tildes y sin guiones, NO PARECE SU DOCUMENTO — y esta tarjeta
+ * existe justo para que lo reconozca. A un supervisor al que se le pide cotejar
+ * contra un texto que no se parece al que firmó no se le está pidiendo nada.
+ *
+ * Así que se traduce la posición: `normalizarConMapa` guarda, por cada carácter
+ * del normalizado, de qué carácter del original salió. Es el mismo desfase que
+ * ya rompió una vez la ventana de contexto, hecho explícito en vez de evitado.
+ *
+ * ── Y CÓMO SE EVITA QUE EL MAPA MIENTA ─────────────────────────────────────
+ *
+ * Un mapa desplazado no falla: subraya la palabra de al lado, con total aplomo.
+ * Sería el peor fallo posible en la tarjeta cuyo único trabajo es demostrar
+ * procedencia, y no habría forma de notarlo mirando.
+ *
+ * Por eso el mapa SE COMPRUEBA CONTRA LA FUNCIÓN CANÓNICA: si el texto que
+ * reconstruye no es idéntico, carácter a carácter, al que devuelve
+ * `normalizar()`, no se usa. Se cae al normalizado de antes —feo, pero es lo
+ * que se midió— y se dice en pantalla por qué.
  */
 function resaltar (e) {
   const texto = (e.fuentes || []).map(f => f.texto).join('\n')
   const norm = normalizar(texto)
   if (!norm) return ''
+
+  const mapa = normalizarConMapa(texto)
+  const fiel = mapa !== null && mapa.texto === norm
+  const base = fiel ? texto : norm
 
   const tramos = Object.values(e.campos)
     .filter(c => c.donde)
@@ -904,19 +1031,92 @@ function resaltar (e) {
   let salida = '', cursor = 0
   for (const t of tramos) {
     if (t.desde < cursor) continue                 // solapado: ya está pintado
-    salida += esc(norm.slice(cursor, t.desde))
-    salida += `<mark class="ev-${esc(t.evidencia)}" title="${esc(t.ruta)}">` +
-              esc(norm.slice(t.desde, t.hasta)) + '</mark>'
-    cursor = t.hasta
+    // Un tramo vacío marcaría un punto sin ancho: el ratón no lo alcanza y el
+    // lector no lo ve.
+    if (t.hasta <= t.desde) continue
+    const desde = fiel ? mapa.ini[t.desde] : t.desde
+    const hasta = fiel ? mapa.fin[t.hasta - 1] : t.hasta
+    if (desde < cursor) continue
+    salida += esc(base.slice(cursor, desde))
+    // La etiqueta va en español y la manda el servidor desde la MISMA tabla que
+    // redacta las preguntas. El `title` solo no basta —un teléfono no tiene
+    // ratón—, así que el nombre del campo se pinta también en la leyenda de
+    // debajo, y `data-ruta` es lo que enlaza las dos al tocarlas.
+    salida += `<mark class="ev-${esc(t.evidencia)}" data-ruta="${esc(t.ruta)}"` +
+              ` title="${esc(etiquetaDe(t.ruta))} · ${esc(t.evidencia)}">` +
+              esc(base.slice(desde, hasta)) + '</mark>'
+    cursor = hasta
   }
-  return salida + esc(norm.slice(cursor))
+  salida += esc(base.slice(cursor))
+
+  // Se declara cuando NO se está enseñando el documento tal cual. Callarlo
+  // sería enseñar un texto adulterado sin avisar, que es de lo que este
+  // proyecto acusa a los demás.
+  if (!fiel) {
+    salida = '<div class="aviso" style="padding:0 0 8px">' +
+             'texto normalizado: no se pudo alinear con el original, y se prefiere ' +
+             'enseñar exactamente lo que se midió</div>' + salida
+  }
+  return salida
 }
 
 /** La misma normalización que core/anclaje.mjs. Si divergen, el resaltado miente. */
 function normalizar (s) {
   return String(s ?? '')
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Normaliza igual que `normalizar()`, pero además devuelve de dónde salió cada
+ * carácter: `ini[i]`/`fin[i]` son el trozo del ORIGINAL que produjo el carácter
+ * `i` del normalizado.
+ *
+ * Se hace carácter a carácter porque ninguna de las tres transformaciones que
+ * aplica `normalizar()` conserva la longitud: NFKD convierte uno en varios
+ * («ﬁ» → «fi»), quitar tildes convierte varios en uno, y colapsar espacios
+ * convierte muchos en uno. Una posición del resultado no dice nada sobre el
+ * original a menos que se haya ido anotando por el camino.
+ *
+ * Devuelve `null` si algo sale distinto de lo que devolvería `normalizar()`.
+ */
+function normalizarConMapa (s) {
+  const original = String(s ?? '')
+  let texto = ''
+  const ini = [], fin = []
+
+  for (let i = 0; i < original.length;) {
+    // Los emoji y demás pares subrogados ocupan dos posiciones de cadena. Ir de
+    // uno en uno los partiría por la mitad, y el mapa quedaría desplazado desde
+    // ahí hasta el final del documento.
+    const ancho = original.codePointAt(i) > 0xFFFF ? 2 : 1
+    const trozo = original.slice(i, i + ancho)
+    const convertido = trozo
+      .normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+
+    for (const ch of convertido) {
+      if (/\s/.test(ch)) {
+        // Colapsar y recortar por delante en el mismo paso: exactamente lo que
+        // hacen el `\s+` y el `trim()` de `normalizar()`.
+        if (texto === '' || texto.endsWith(' ')) continue
+        texto += ' '
+      } else {
+        texto += ch
+      }
+      ini.push(i); fin.push(i + ancho)
+    }
+    i += ancho
+  }
+  // Y recortar por detrás.
+  while (texto.endsWith(' ')) { texto = texto.slice(0, -1); ini.pop(); fin.pop() }
+
+  // ── EL VERIFICADOR NO PUEDE SER PARTE DE LO VERIFICADO ────────────────────
+  //
+  // Esta comparación es barata y es la única razón por la que se puede confiar
+  // en el mapa: si esta función y `normalizar()` se separan alguna vez, el
+  // resaltado no se desplaza en silencio — deja de usarse.
+  return texto === normalizar(original) ? { texto, ini, fin } : null
 }
 
 // ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────

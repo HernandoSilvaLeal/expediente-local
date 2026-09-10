@@ -97,12 +97,12 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **370 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **390 tests** en poco más de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
-| Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
+| Que nada descalifica | `npm run verify:entrega` | **17 puertas**, cada una eliminatoria |
 | Que **cada guardia** hace su trabajo | `npm run casos` | **17 casos trampa**, cobertura G1..G10 — una por guardia, sin excepción |
-| Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
+| Que los datos del disco están sanos | `npm run verify:invariantes` | **6/6** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
 | **Los datos de ejemplo** | `npm run demo` | tres expedientes sembrados en 2 s: uno limpio, uno con invenciones, uno en conflicto |
 | **La constancia para el supervisor** | `node cli.mjs constancia --ledger datos/EXP-001.jsonl` | por qué se aprobó, con la norma citada |
@@ -291,7 +291,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 370 tests, sin modelo y sin red
+npm test                  # 390 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -306,7 +306,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **370/370** | 1 s |
+| `npm test` → **390/390** | ~1,2 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
@@ -370,16 +370,16 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **370 / 370** verdes, sin modelo y sin red |
-| De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
+| Tests | **390 / 390** verdes, sin modelo y sin red |
+| De ellos, prueban que algo **NO** se puede | **201 de 390 → 51,5 %** |
 | Casos de uso punta a punta | **25** |
 | Casos trampa, uno por guardia | **17 / 17** — cobertura G1..G10 completa |
 | Módulos que **importan** el SDK / total | **3 / 18** → **83,3 %** no lo importa |
 | De esos 3, los que **ejecutan inferencia** | **2** → **88,9 %** del sistema no toca un modelo |
 | De esos 2, los que **pueden meter un dato** en el expediente | **1** → **94,4 %** no puede meter un dato |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
-| Puertas de entrega en PASS | **15 / 16** — la del SDK exige que el instalado sea el declarado |
-| Invariantes O1..O5 sobre datos reales | **5 / 5** |
+| Puertas de entrega en PASS | **16 / 17** — la del SDK exige que el instalado sea el declarado |
+| Invariantes O1..O6 sobre datos reales | **6 / 6** |
 
 > **Por qué tres filas y no una.** Importar el SDK, inferir y decidir qué entra
 > al expediente son cosas distintas: `malla/proveedor.mjs` importa el SDK para
