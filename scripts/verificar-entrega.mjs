@@ -126,9 +126,21 @@ puerta('los artefactos de audit/ no están caducados', () => {
     .map(f => join(RAIZ, 'audit', f)).filter(existsSync)
   if (!artefactos.length) return { ok: true, detalle: 'no hay artefactos que comprobar' }
 
+  // ── SE MIRA EL CÓDIGO QUE DESCRIBEN, NO CUALQUIER COMMIT ─────────────────
+  //
+  // La primera versión comparaba contra el último commit a secas, y eso se
+  // muerde la cola: el commit que GUARDA los artefactos es posterior a ellos,
+  // así que la puerta fallaba justo después de hacer las cosas bien.
+  //
+  // Lo que importa es si el artefacto describe el código de hoy. Así que se
+  // compara contra el último commit que tocó lo que los artefactos miden —y
+  // `audit/` queda fuera de esa cuenta, porque un artefacto no se describe a
+  // sí mismo.
+  const DESCRITO = ['core', 'scripts', 'pruebas', 'ia', 'instancias', 'malla', 'ui', 'cli.mjs']
   let ultimoCambio
   try {
-    ultimoCambio = new Date(execFileSync('git', ['log', '-1', '--format=%cI'],
+    ultimoCambio = new Date(execFileSync('git',
+      ['log', '-1', '--format=%cI', '--', ...DESCRITO],
       { cwd: RAIZ, encoding: 'utf8' }).trim())
   } catch { return { ok: true, detalle: 'sin git: no se puede comparar' } }
   if (Number.isNaN(ultimoCambio.getTime())) return { ok: true, detalle: 'sin commits' }
