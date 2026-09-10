@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "node ui/servidor.mjs",
+    "sucursal": "node scripts/sucursal.mjs",
     "demo": "node scripts/demo.mjs --limpiar",
     "setup": "node scripts/setup.mjs",
     "smoke": "node scripts/smoke.mjs",
