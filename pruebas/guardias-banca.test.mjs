@@ -216,13 +216,28 @@ test('GB-02 · revisarDominio aplica G6 sobre la cédula y solo sobre ella', () 
   assert.deepEqual([...otra], [], 'un nombre no se valida como cédula')
 })
 
-test('GB-03 · G7 se calla si no se le da reloj', () => {
-  const sin = revisarDominio({ ruta: 'documentos[0].fecha_emision', valor: '12 de marzo de 2020' })
-  assert.deepEqual([...sin], [], 'sin `hoy` inyectado, G7 no opina')
+test('GB-03 · G7 se calla si no se le da reloj, Y si el esquema no dice que caduque', () => {
+  const campo = { ruta: 'documentos[0].fecha_emision', valor: '12 de marzo de 2020' }
+  const PLAZOS = { vigenciaDias: { 'documentos[].fecha_emision': 90 } }
 
-  const con = revisarDominio({ ruta: 'documentos[0].fecha_emision', valor: '12 de marzo de 2020' }, { hoy: HOY })
+  assert.deepEqual([...revisarDominio(campo, PLAZOS)], [],
+    'sin `hoy` inyectado, G7 no opina')
+
+  // Y esta es la segunda mitad, que se añadió cuando el esquema creció al
+  // artículo 18: G7 decidía por el NOMBRE del campo —cualquier ruta con la
+  // palabra «fecha»—, así que `titular.fecha_nacimiento` salía rechazada como
+  // DOCUMENTO VENCIDO. Una persona nacida en 1988 no está vencida.
+  assert.deepEqual([...revisarDominio(campo, { hoy: HOY })], [],
+    'sin plazo declarado en el esquema, G7 tampoco opina: lo que no se declara, no caduca')
+
+  const con = revisarDominio(campo, { hoy: HOY, ...PLAZOS })
   assert.equal(con.length, 1)
   assert.equal(con[0].guardia, 'G7')
+
+  // Un nacimiento nunca vence, y ahora es el esquema quien lo dice.
+  assert.deepEqual(
+    [...revisarDominio({ ruta: 'titular.fecha_nacimiento', valor: '14 de marzo de 1988' }, { hoy: HOY, ...PLAZOS })],
+    [], 'una fecha de nacimiento no es un documento que caduque')
 })
 
 test('GB-04 · las guardias de dominio son deterministas', () => {

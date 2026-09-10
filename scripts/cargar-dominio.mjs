@@ -26,6 +26,9 @@ const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..')
  * @returns {{revisar: function|null, contexto: object, origen: string|null}}
  */
 export async function cargarDominio (esquema, contexto = {}) {
+  // Los plazos de vigencia salen del ESQUEMA y viajan en el contexto: las
+  // guardias los reciben, no los buscan. Quien llame puede sobreescribirlos.
+  contexto = { vigenciaDias: esquema?.vigenciaDias ?? {}, ...contexto }
   if (!esquema?.guardiasDominio) {
     // Un esquema sin guardias de dominio es legítimo: el de salud no tiene
     // cédulas panameñas que validar. No es un error, es otro dominio.

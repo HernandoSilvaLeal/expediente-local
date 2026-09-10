@@ -269,9 +269,28 @@ export const GUARDIAS_BANCA = Object.freeze([
     id: 'G7', que: 'vigencia del documento',
     porque: 'un recibo de hace un año no prueba domicilio hoy, y una fecha futura es un error de lectura',
     aplicar ({ ruta, valor, contexto }) {
-      if (!/fecha/.test(rutaGenerica(ruta))) return null
+      // ── A QUÉ CAMPOS APLICA LO DICE EL ESQUEMA, NO EL NOMBRE DEL CAMPO ─────
+      //
+      // Esto era `/fecha/.test(...)`: cualquier ruta que llevara la palabra
+      // «fecha» pasaba por la comprobación de vigencia. Al ampliar el esquema a
+      // los datos que exige el artículo 18 del Acuerdo 1-2026 saltó de
+      // inmediato: `titular.fecha_nacimiento` salía rechazada como DOCUMENTO
+      // VENCIDO. Una persona nacida en 1988 no está vencida.
+      //
+      // El fallo no era el umbral: era decidir por el NOMBRE. «fecha_nacimiento»,
+      // «fecha_de_constitución», «fecha de vinculación» — ninguna caduca, y
+      // todas llevan la palabra. La heurística acertaba por casualidad mientras
+      // el esquema solo tenía un campo de fecha.
+      //
+      // Ahora el esquema declara cuáles vencen, en `vigencia_dias`. Es dato, no
+      // código, igual que las unidades y la aritmética: quien instale esto en
+      // otro banco cambia un .json, no una expresión regular.
+      const plazos = contexto?.vigenciaDias ?? {}
+      const generica = rutaGenerica(ruta)
+      const dias = plazos[generica]
+      if (dias === undefined) return null           // el esquema no dice que caduque
       if (!contexto?.hoy) return null              // sin reloj inyectado, G7 se calla
-      const r = vigencia(valor, { hoy: contexto.hoy, diasMaximos: contexto.diasMaximos ?? 90 })
+      const r = vigencia(valor, { hoy: contexto.hoy, diasMaximos: dias })
       if (!r.conocida || r.vigente) return null
       return { motivo: r.motivo, detalle: r.detalle }
     }

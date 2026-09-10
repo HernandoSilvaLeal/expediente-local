@@ -73,6 +73,11 @@ export function cargarEsquema (rutaRelativa) {
     // restringe al modelo. Esto es contrato de validación, que es otra cosa
     // y la lee otro consumidor (G4).
     unidades: Object.freeze({ ...(crudo.unidades ?? {}) }),
+    // Qué campos CADUCAN y en cuántos días. Va aquí y no en el código de las
+    // guardias porque la respuesta cambia de un banco a otro: decidirlo por el
+    // nombre del campo ya falló una vez, con titular.fecha_nacimiento saliendo
+    // rechazada como «documento vencido».
+    vigenciaDias: Object.freeze({ ...(crudo.vigencia_dias ?? {}) }),
     // La identidad del registro, para deduplicar. Si el esquema no la declara,
     // core/dedup.mjs cae al primer campo crítico.
     claveNatural: Object.freeze([...(crudo.clave_natural ?? [])]),

@@ -7,6 +7,72 @@
     "cedula": {
       "valor": "8-123-456",
       "cita": "cédula 8-123-456"
+    },
+    "fecha_nacimiento": {
+      "valor": "14 de marzo de 1988",
+      "cita": "nacido el 14 de marzo de 1988"
+    },
+    "genero": {
+      "valor": "masculino",
+      "cita": "género masculino"
+    },
+    "nacionalidad": {
+      "valor": "panameña",
+      "cita": "de nacionalidad panameña"
+    },
+    "pais_nacimiento": {
+      "valor": "Panamá",
+      "cita": "nacido en Panamá"
+    },
+    "pais_domicilio": {
+      "valor": "Panamá",
+      "cita": "con país de domicilio Panamá"
+    },
+    "profesion_u_oficio": {
+      "valor": "contador",
+      "cita": "profesión u oficio es contador"
+    },
+    "actividad_ingreso": {
+      "valor": "empleo asalariado",
+      "cita": "actividad de fuente de ingreso es empleo asalariado"
+    },
+    "origen_recursos": {
+      "valor": "Panamá",
+      "cita": "El origen de los recursos es Panamá"
+    },
+    "destino_recursos": {
+      "valor": "Panamá",
+      "cita": "el destino de los recursos es Panamá"
+    },
+    "direccion": {
+      "valor": "Vía España, edificio Marbella, apartamento 12-B, corregimiento de Bella Vista",
+      "cita": "Su dirección es Vía España, edificio Marbella, apartamento 12-B, corregimiento de Bella Vista"
+    },
+    "contacto": {
+      "valor": "6123-4567",
+      "cita": "el teléfono 6123-4567"
+    }
+  },
+  "operacion": {
+    "producto": {
+      "valor": "cuenta de ahorros",
+      "cita": "el producto cuenta de ahorros"
+    },
+    "tipo_transaccion": {
+      "valor": "depósito en efectivo",
+      "cita": "tipo de transacción depósito en efectivo"
+    },
+    "monto_transaccional": {
+      "valor": 800.0,
+      "cita": "monto transaccional estimado de 800.00 balboas"
+    },
+    "frecuencia": {
+      "valor": "mensual",
+      "cita": "frecuencia mensual"
+    },
+    "canal": {
+      "valor": "sucursal",
+      "cita": "canal de sucursal"
     }
   },
   "documentos": [
@@ -14,7 +80,7 @@
       "tipo": "RECIBO_SERVICIO",
       "emisor": {
         "valor": "IDAAN",
-        "cita": "El recibo del IDAAN"
+        "cita": "el recibo del IDAAN"
       },
       "fecha_emision": {
         "valor": "20 de agosto de 2026",

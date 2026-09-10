@@ -367,6 +367,48 @@ usted no lo pongo**:
 
 ---
 
+## 🇵🇦 El esquema no lo inventamos: lo dicta el Acuerdo 1-2026
+
+**El Acuerdo 10-2015 está derogado.** Desde el **16 de enero de 2026** rige el
+**Acuerdo 1-2026** de la Superintendencia de Bancos de Panamá, y es el que este
+esquema atiende — artículo por artículo, no de oídas.
+
+| Artículo | Qué exige | Dónde vive aquí |
+|---|---|---|
+| **10.4** | constancia documentada de la debida diligencia | el ledger: cada hecho con su instante, su origen y su hash |
+| **18** | perfil del cliente: **14 datos** + identificación mínima | `instancias/banca/esquema.json`, cada campo con su `$norma` |
+| **29** | conservar 5 años y permitir **reconstruir** la operación | el expediente no se guarda: se **regenera** del ledger (invariante O5) |
+
+Los catorce datos del perfil del artículo 18 —actividad de la fuente de ingreso,
+fecha de nacimiento, género, profesión, nacionalidad, origen y destino de los
+recursos, país de nacimiento y de domicilio, producto, tipo de transacción,
+monto, frecuencia y canal— **son campos críticos del esquema**. Un expediente al
+que le falte cualquiera de ellos no llega a completo y no se puede firmar:
+
+```bash
+npm run demo && node cli.mjs ver --ledger datos/EXP-002.jsonl
+#  22 campos anclados · 3 rechazados
+#  faltan críticos: titular.cedula, titular.profesion_u_oficio
+```
+
+> **Lo que esto costó, y se cuenta porque es la parte interesante:** al ampliar
+> el esquema, **19 tests se pusieron en rojo a la vez**. Todos tenían razón. Un
+> expediente con nombre y cédula ya no está completo — y nunca lo estuvo para el
+> regulador, solo para nuestro esquema de juguete.
+>
+> Y saltó un fallo de diseño: G7, la guardia de vigencia, decidía por el
+> **nombre** del campo (`/fecha/`), así que `titular.fecha_nacimiento` salía
+> rechazada como **documento vencido**. Una persona nacida en 1988 no está
+> vencida. Ahora qué caduca y en cuántos días lo declara el esquema en
+> `vigencia_dias`: es dato, como las unidades y la aritmética. Quien instale
+> esto en otro banco cambia un `.json`, no una expresión regular.
+
+**Todos los datos de ejemplo son sintéticos y ficticios.** Ninguna persona real,
+ningún cliente real: el enunciado del reto prohíbe datos reales de clientes de
+cualquier entidad financiera, y aquí se cumple.
+
+---
+
 ## Trabajo previo · de quién aprendimos y en qué nos apartamos
 
 Verificar una extracción contra su fuente **no es invento nuestro**, y decir lo

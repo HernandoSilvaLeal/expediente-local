@@ -15,26 +15,90 @@
     "la cita sea substring normalizado de la fuente. Si no lo es, el campo vale DESCONOCIDO.",
     "El modelo no puede alucinar una cita que el software va a buscar con indexOf."
   ],
-
   "dominio": "banca",
   "version": "1.0.0",
   "entidad": "expediente",
   "descripcion": "Expediente de apertura de cuenta de un cliente en sucursal",
-
   "json_schema": {
     "name": "expediente",
     "schema": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["titular", "documentos"],
+      "required": [
+        "titular",
+        "documentos",
+        "operacion"
+      ],
       "properties": {
         "titular": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["nombre", "cedula"],
+          "required": [
+            "nombre",
+            "cedula",
+            "fecha_nacimiento",
+            "genero",
+            "nacionalidad",
+            "pais_nacimiento",
+            "pais_domicilio",
+            "profesion_u_oficio",
+            "actividad_ingreso",
+            "origen_recursos",
+            "destino_recursos",
+            "direccion",
+            "contacto"
+          ],
           "properties": {
-            "nombre":  { "$ref": "#/$defs/campoTexto" },
-            "cedula":  { "$ref": "#/$defs/campoTexto" }
+            "nombre": {
+              "$ref": "#/$defs/campoTexto"
+            },
+            "cedula": {
+              "$ref": "#/$defs/campoTexto"
+            },
+            "fecha_nacimiento": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 2"
+            },
+            "genero": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 3"
+            },
+            "nacionalidad": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 5"
+            },
+            "pais_nacimiento": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · perfil nº 8"
+            },
+            "pais_domicilio": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 9"
+            },
+            "profesion_u_oficio": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 4"
+            },
+            "actividad_ingreso": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima y perfil nº 1"
+            },
+            "origen_recursos": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · perfil nº 6 — jurisdicción de la que se reciben"
+            },
+            "destino_recursos": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · perfil nº 7 — jurisdicción a la que se envían"
+            },
+            "direccion": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima"
+            },
+            "contacto": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "art. 18 · identificación mínima — datos de contacto"
+            }
           }
         },
         "documentos": {
@@ -42,18 +106,75 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["tipo", "emisor", "fecha_emision", "monto"],
+            "required": [
+              "tipo",
+              "emisor",
+              "fecha_emision",
+              "monto"
+            ],
             "properties": {
               "tipo": {
                 "type": "string",
-                "enum": ["CEDULA", "RECIBO_SERVICIO", "CARTA_LABORAL", "FORMULARIO", "DESCONOCIDO"]
+                "enum": [
+                  "CEDULA",
+                  "RECIBO_SERVICIO",
+                  "CARTA_LABORAL",
+                  "FORMULARIO",
+                  "DESCONOCIDO"
+                ]
               },
-              "emisor":        { "$ref": "#/$defs/campoTexto" },
-              "fecha_emision": { "$ref": "#/$defs/campoTexto" },
-              "monto":         { "$ref": "#/$defs/campoNumero" },
-              "salario_mensual":  { "$ref": "#/$defs/campoNumero" },
-              "periodos":         { "$ref": "#/$defs/campoNumero" },
-              "total_declarado":  { "$ref": "#/$defs/campoNumero" }
+              "emisor": {
+                "$ref": "#/$defs/campoTexto"
+              },
+              "fecha_emision": {
+                "$ref": "#/$defs/campoTexto"
+              },
+              "monto": {
+                "$ref": "#/$defs/campoNumero"
+              },
+              "salario_mensual": {
+                "$ref": "#/$defs/campoNumero"
+              },
+              "periodos": {
+                "$ref": "#/$defs/campoNumero"
+              },
+              "total_declarado": {
+                "$ref": "#/$defs/campoNumero"
+              }
+            }
+          }
+        },
+        "operacion": {
+          "type": "object",
+          "additionalProperties": false,
+          "$norma": "art. 18 · perfil del cliente, puntos 10 a 14",
+          "required": [
+            "producto",
+            "tipo_transaccion",
+            "monto_transaccional",
+            "frecuencia",
+            "canal"
+          ],
+          "properties": {
+            "producto": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "perfil nº 10 — tipos de productos y servicios"
+            },
+            "tipo_transaccion": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "perfil nº 11 — tipo de transacción o instrumento"
+            },
+            "monto_transaccional": {
+              "$ref": "#/$defs/campoNumero",
+              "$norma": "perfil nº 12"
+            },
+            "frecuencia": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "perfil nº 13"
+            },
+            "canal": {
+              "$ref": "#/$defs/campoTexto",
+              "$norma": "perfil nº 14 — canales utilizados"
             }
           }
         }
@@ -62,10 +183,15 @@
         "campoTexto": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["valor", "cita"],
+          "required": [
+            "valor",
+            "cita"
+          ],
           "properties": {
-            "valor": { "type": "string" },
-            "cita":  {
+            "valor": {
+              "type": "string"
+            },
+            "cita": {
               "type": "string",
               "description": "Fragmento LITERAL de la fuente donde aparece este valor. Si no existe, cadena vacía."
             }
@@ -74,21 +200,26 @@
         "campoNumero": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["valor", "cita"],
+          "required": [
+            "valor",
+            "cita"
+          ],
           "properties": {
-            "valor": { "type": "number" },
-            "cita":  { "type": "string" }
+            "valor": {
+              "type": "number"
+            },
+            "cita": {
+              "type": "string"
+            }
           }
         }
       }
     }
   },
-
   "vacios": {
     "texto": "DESCONOCIDO",
     "numero": 0
   },
-
   "$nota_sin_confianza": [
     "AL MODELO NO SE LE PREGUNTA CUÁNTA CONFIANZA TIENE. Antes había aquí un campo",
     "'confianza' con enum Confirmado|Reportado|Estimado|Desconocido, y era un error de",
@@ -102,35 +233,65 @@
     "",
     "Regla general: no le pidas al modelo lo que puedes calcular."
   ],
-
   "unidades": {
     "documentos[].monto": "balboas",
     "documentos[].salario_mensual": "balboas",
-    "documentos[].total_declarado": "balboas"
+    "documentos[].total_declarado": "balboas",
+    "operacion.monto_transaccional": "balboas"
   },
-
   "aritmetica": {
     "parcial": "documentos[].salario_mensual",
     "periodos": "documentos[].periodos",
     "total": "documentos[].total_declarado",
     "$": "Que G8 tiene que cuadrar. Las rutas van aqui, en el esquema, y no dentro de la guardia: asi el mismo G8 sirve para cualquier trio de campos que deba multiplicar."
   },
-
   "$nota_unidades": "Fuera del json_schema a propósito: el json_schema es la gramática que restringe al modelo (llama.cpp lo compila a GBNF); esto es contrato de validación y lo lee G4. Son dos consumidores distintos y mezclarlos ensucia los dos. Panamá usa el balboa a la par con el dólar y en la calle se dicen ambos: los sinónimos están en core/guardias.mjs.",
-
   "guardias_dominio": "instancias/banca/guardias.mjs",
-
   "$nota_guardias_dominio": "El esquema dice DONDE viven sus reglas de negocio, y quien arranca el sistema las carga y las INYECTA. core/ nunca las importa: si lo hiciera, 'el mismo codigo sirve para otro dominio' dejaria de ser cierto. Cambiar de dominio sigue siendo cambiar un .json.",
-
-  "clave_natural": ["titular.cedula"],
-
+  "clave_natural": [
+    "titular.cedula"
+  ],
   "$nota_clave_natural": "La identidad de un expediente bancario es la cédula, y compararla normalizada es exacto, instantáneo y explicable. Los embeddings solo harian falta si NO hubiera clave, y entonces vivirian en ia/, no en core/. El corpus tiene medido el peligro de lo contrario: el maximo de similitud legitima observado fue 0,3702 — cualquier umbral absoluto por debajo junta a personas distintas, y por encima no junta nada.",
-
   "campos_criticos": [
     "titular.cedula",
+    "titular.fecha_nacimiento",
+    "titular.genero",
+    "titular.nacionalidad",
+    "titular.pais_domicilio",
+    "titular.profesion_u_oficio",
+    "titular.actividad_ingreso",
+    "titular.origen_recursos",
+    "titular.destino_recursos",
+    "titular.direccion",
+    "titular.contacto",
+    "titular.nombre",
+    "operacion.producto",
+    "operacion.tipo_transaccion",
+    "operacion.monto_transaccional",
+    "operacion.frecuencia",
+    "operacion.canal",
     "documentos[].tipo",
     "documentos[].fecha_emision"
   ],
-
-  "$nota_campos_criticos": "Un expediente al que le falte uno de estos NO puede llegar a estado COMPLETO. Es lo que dispara la repregunta determinista."
+  "$nota_campos_criticos": "Un expediente al que le falte uno de estos NO puede llegar a estado COMPLETO. Es lo que dispara la repregunta determinista.",
+  "$norma": {
+    "referencia": "Acuerdo 1-2026 de la Superintendencia de Bancos de Panamá",
+    "vigente_desde": "2026-01-16",
+    "deroga": "Acuerdo 10-2015",
+    "articulos_que_este_esquema_atiende": {
+      "art. 10.4": "constancia documentada de la debida diligencia",
+      "art. 18": "debida diligencia para personas naturales: perfil del cliente (14 datos) e identificación mínima",
+      "art. 29": "conservación 5 años y RECONSTRUCCIÓN de la operación"
+    },
+    "aviso": "Los datos de ejemplo son SINTÉTICOS. Ninguna persona real, ningún cliente real."
+  },
+  "vigencia_dias": {
+    "$comentario": [
+      "Qué campos CADUCAN, y en cuántos días. Es dato porque la respuesta cambia",
+      "de un banco a otro y de un producto a otro, y porque decidirlo por el nombre",
+      "del campo ya falló: titular.fecha_nacimiento salía «DOCUMENTO VENCIDO».",
+      "Lo que no aparece aquí, no vence."
+    ],
+    "documentos[].fecha_emision": 90
+  }
 }

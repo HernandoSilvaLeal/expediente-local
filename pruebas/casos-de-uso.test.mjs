@@ -28,6 +28,7 @@ import { ORIGENES } from '../core/estado.mjs'
 import { leer } from '../core/ledger.mjs'
 import { calidad } from '../core/calidad.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
+import { FUENTE_ART18, expedienteArt18, titularArt18, operacionArt18, documentoArt18 } from './fixtures.mjs'
 import { RECHAZO } from '../core/guardias.mjs'
 import { revisarDominio } from '../instancias/banca/guardias.mjs'
 
@@ -47,23 +48,12 @@ function sucursal (nombre = 'EXP-001') {
 }
 
 // El texto que un oficial de sucursal dictaría al recibir la carpeta.
-const DICTADO =
-  'El titular es Juan Pérez González, cédula 8-123-456. ' +
-  'Presenta el recibo del IDAAN del 12 de marzo de 2026 por 45.30 balboas. ' +
-  'Trae además una carta laboral que consta firmada y sellada.'
-
-const EXTRACCION_BUENA = {
-  titular: {
-    nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-    cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' }
-  },
-  documentos: [{
-    tipo: 'RECIBO_SERVICIO',
-    emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
-    fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto:         { valor: 45.30, cita: 'por 45.30 balboas' }
-  }]
-}
+// El dictado y el expediente de referencia viven en pruebas/fixtures.mjs desde
+// que el esquema se amplió al artículo 18 del Acuerdo 1-2026. Diecinueve tests
+// se pusieron en rojo a la vez y todos tenían razón: un expediente con nombre y
+// cédula ya no está completo — nunca lo estuvo para el regulador.
+const DICTADO = FUENTE_ART18
+const EXTRACCION_BUENA = expedienteArt18()
 
 // ═════════════════════════════════════════════════════════════════════
 //  CASO 1 · El camino que el banco quiere: expediente completo y aprobado
@@ -102,21 +92,15 @@ test('CU-2 · MEDIDO · las tres invenciones reales del 9-sep quedan fuera', () 
   try {
     exp.capturar(DICTADO)
 
-    const conInvenciones = {
-      titular: {
-        nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-        // (a) INVENCIÓN PURA: nadie dijo esta cédula
-        cedula: { valor: '8-999-999', cita: 'cédula 8-999-999' }
-      },
-      documentos: [{
-        tipo: 'RECIBO_SERVICIO',
-        // (b) INVENCIÓN CON COARTADA: la cita es real, el valor no sale de ella
-        emisor:        { valor: 'ETESA', cita: 'el recibo del IDAAN' },
-        fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-        // (c) CANTIDAD CAMBIADA: el número no está en su propia cita
-        monto:         { valor: 999.99, cita: 'por 45.30 balboas' }
-      }]
-    }
+    // Se parte del expediente correcto y se le meten las TRES invenciones: así
+    // lo único que distingue este caso del camino feliz son esos tres campos.
+    const conInvenciones = expedienteArt18()
+    // (a) INVENCIÓN PURA: nadie dijo esta cédula
+    conInvenciones.titular.cedula = { valor: '8-999-999', cita: 'cédula 8-999-999' }
+    // (b) INVENCIÓN CON COARTADA: la cita es real, el valor no sale de ella
+    conInvenciones.documentos[0].emisor = { valor: 'ETESA', cita: 'el recibo del IDAAN' }
+    // (c) CANTIDAD CAMBIADA: el número no está en su propia cita
+    conInvenciones.documentos[0].monto = { valor: 999.99, cita: 'por 45.30 balboas' }
 
     const { revision } = exp.asentar(conInvenciones)
     const e = exp.leer()
@@ -458,10 +442,15 @@ test('CU-16 · un recibo VENCIDO se marca, con los días', () => {
       ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-V',
       ahora: () => `2026-09-10T16:${String(n++).padStart(2, '0')}:00.000Z`,
       guardiasDominio: revisarDominio,
-      contextoDominio: { hoy: new Date(Date.UTC(2026, 8, 10)), diasMaximos: 90 }
+      contextoDominio: { hoy: new Date(Date.UTC(2026, 8, 10)),
+                         vigenciaDias: { 'documentos[].fecha_emision': 90 } }
     })
-    exp.capturar(DICTADO)
-    const { revision } = exp.asentar(EXTRACCION_BUENA)
+    // El dictado y la extracción llevan la fecha VIEJA: el resto del expediente
+    // es el de referencia, así que lo único que se prueba aquí es la vigencia.
+    exp.capturar(DICTADO.replace('del 20 de agosto de 2026', 'del 12 de marzo de 2026'))
+    const viejo = expedienteArt18()
+    viejo.documentos[0].fecha_emision = { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' }
+    const { revision } = exp.asentar(viejo)
 
     const fecha = revision.campos.find(c => c.ruta === 'documentos[0].fecha_emision')
     assert.equal(fecha.aceptado, false, 'el 12 de marzo son más de 90 días antes del 10 de septiembre')
@@ -761,18 +750,18 @@ test('CU-23 · ⭐ un expediente con el titular en disputa NO se puede aprobar',
       monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }
 
     // Fuente 1 — el formulario de apertura. Expediente completo y aprobable.
-    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
-    exp.asentar({ titular: {
-      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [doc] })
+    exp.capturar(DICTADO)
+    exp.asentar(expedienteArt18())
 
     assert.ok(calidad(exp.leer(), ESQ).puedeCerrar, 'con una sola fuente, cierra')
 
     // Fuente 2 — la carta laboral. Otro titular, la misma cédula.
-    exp.capturar('Según la carta laboral el titular es María Gómez Batista, cédula 8-123-456.')
+    exp.capturar(DICTADO.replace('El titular es Juan Pérez González',
+                                 'Según la carta laboral el titular es María Gómez Batista'))
     exp.asentar({ titular: {
-      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' },
-      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [] })
+      ...titularArt18(),
+      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' } },
+      operacion: operacionArt18(), documentos: [] })
 
     const e = exp.leer()
     assert.equal(e.conflictos.length, 1, 'el conflicto está levantado')
@@ -819,14 +808,8 @@ test('CU-24 · ⭐ no se aprueba ni se rechaza sin decir quién firma', () => {
       ahora: () => `2026-09-11T00:${String(n++).padStart(2, '0')}:00.000Z`
     })
 
-    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
-    exp.asentar({ titular: {
-      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } },
-      documentos: [{ tipo: 'RECIBO_SERVICIO',
-        emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
-        fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
-        monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }] })
+    exp.capturar(DICTADO)
+    exp.asentar(expedienteArt18())
 
     const hechosAntes = leer(ruta).length
 
@@ -893,15 +876,15 @@ test('CU-25 · ⭐ una persona zanja el conflicto, y solo entonces se puede firm
       fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
       monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }
 
-    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
-    exp.asentar({ titular: {
-      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [doc] })
+    exp.capturar(DICTADO)
+    exp.asentar(expedienteArt18())
 
-    exp.capturar('Según la carta laboral el titular es María Gómez Batista, cédula 8-123-456.')
+    exp.capturar(DICTADO.replace('El titular es Juan Pérez González',
+                                 'Según la carta laboral el titular es María Gómez Batista'))
     exp.asentar({ titular: {
-      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' },
-      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [] })
+      ...titularArt18(),
+      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' } },
+      operacion: operacionArt18(), documentos: [] })
 
     assert.equal(exp.leer().conflictos.length, 1)
 

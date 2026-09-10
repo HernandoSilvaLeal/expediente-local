@@ -17,9 +17,11 @@ import { claveDe, comparar, buscarDuplicado, agrupar, VEREDICTO } from '../core/
 import { calidad, preguntasPendientes, siguientePregunta, MOTIVO_PREGUNTA } from '../core/calidad.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
+import { FUENTE_ART18, expedienteArt18 } from './fixtures.mjs'
 
-const FUENTE = 'El titular es Juan Pérez González, cédula 8-123-456. ' +
-  'Presenta el recibo del IDAAN del 12 de marzo de 2026 por 45.30 balboas.'
+// Ver pruebas/fixtures.mjs: el expediente de referencia vive en un solo sitio
+// desde que el esquema se amplió al artículo 18 del Acuerdo 1-2026.
+const FUENTE = FUENTE_ART18
 
 const dirs = []
 function expedienteCon (id, extraido, fuente = FUENTE) {
@@ -35,18 +37,7 @@ function expedienteCon (id, extraido, fuente = FUENTE) {
 }
 const limpiar = () => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }) }
 
-const COMPLETO = {
-  titular: {
-    nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-    cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' }
-  },
-  documentos: [{
-    tipo: 'RECIBO_SERVICIO',
-    emisor: { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
-    fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto: { valor: 45.30, cita: 'por 45.30 balboas' }
-  }]
-}
+const COMPLETO = expedienteArt18()
 
 // ═════════════════════════════════════════════════════════════════════
 //  T13 · DEDUPLICACIÓN

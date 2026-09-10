@@ -10,29 +10,19 @@ import assert from 'node:assert/strict'
 
 import { cargarEsquema, specDeCampo, rutaGenerica, resolverRef } from '../core/esquema.mjs'
 import { revisar, GUARDIAS, RECHAZO } from '../core/guardias.mjs'
+import { FUENTE_ART18, expedienteArt18 } from './fixtures.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
 const ESQ_SALUD = cargarEsquema('instancias/salud/esquema.json')
 
 /** La fuente de todos los casos: un texto de sucursal, sintético y ficticio. */
-const FUENTE =
-  'El titular es Juan Pérez González, cédula 8-123-456. ' +
-  'Presenta el recibo del IDAAN del 12 de marzo de 2026 por 45.30 balboas. ' +
-  'Trae además una carta laboral que consta firmada y sellada.'
+// La fuente y el expediente de referencia viven en pruebas/fixtures.mjs desde
+// que el esquema se amplió al artículo 18 del Acuerdo 1-2026. Tenerlos copiados
+// aquí hacía que un cambio legítimo de contrato pareciera una rotura masiva.
+const FUENTE = FUENTE_ART18
 
 /** Un extraído correcto, del que parten casi todos los casos. */
-const bueno = () => ({
-  titular: {
-    nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-    cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' }
-  },
-  documentos: [{
-    tipo: 'RECIBO_SERVICIO',
-    emisor:        { valor: 'IDAAN',          cita: 'el recibo del IDAAN' },
-    fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto:         { valor: 45.30,            cita: 'por 45.30 balboas' }
-  }]
-})
+const bueno = expedienteArt18
 
 const campo = (r, ruta) => r.campos.find(c => c.ruta === ruta)
 const motivos = (r, ruta) => campo(r, ruta).rechazos.map(x => x.motivo)

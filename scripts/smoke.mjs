@@ -25,30 +25,22 @@ import { join } from 'node:path'
 
 import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente, aCsv } from '../core/expediente.mjs'
+import { FUENTE_ART18, expedienteArt18 } from '../pruebas/fixtures.mjs'
 
 const V = '\x1b[0;32m', R = '\x1b[0;31m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
 
-const DICTADO =
-  'El titular es Juan Pérez González, cédula 8-123-456. ' +
-  'Presenta el recibo del IDAAN del 12 de marzo de 2026 por 45.30 balboas.'
+// El dictado y el expediente de referencia salen de pruebas/fixtures.mjs: los
+// mismos que usa la suite, para que el humo pruebe lo que se está probando.
+const DICTADO = FUENTE_ART18
 
 // Lo que un modelo devuelve: JSON perfectamente válido, con dos campos falsos.
 //
 // Uno de los dos es la CÉDULA, que es campo crítico. Esa elección no es casual:
 // es el caso que le importa al banco. Un dato inventado en un campo crítico no
 // rellena el hueco — lo deja igual de vacío, y el expediente no puede aprobarse.
-const PROPUESTO = {
-  titular: {
-    nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
-    cedula: { valor: '8-999-999', cita: 'cédula 8-999-999' }               // ← INVENTADA, y es crítica
-  },
-  documentos: [{
-    tipo: 'RECIBO_SERVICIO',
-    emisor:        { valor: 'ETESA', cita: 'el recibo del IDAAN' },        // ← inventado con coartada
-    fecha_emision: { valor: '12 de marzo de 2026', cita: 'del 12 de marzo de 2026' },
-    monto:         { valor: 45.30, cita: 'por 45.30 balboas' }
-  }]
-}
+const PROPUESTO = expedienteArt18()
+PROPUESTO.titular.cedula = { valor: '8-999-999', cita: 'cédula 8-999-999' }        // ← INVENTADA, y es crítica
+PROPUESTO.documentos[0].emisor = { valor: 'ETESA', cita: 'el recibo del IDAAN' }   // ← inventado con coartada
 
 const dir = mkdtempSync(join(tmpdir(), 'expediente-smoke-'))
 let paso = 0
