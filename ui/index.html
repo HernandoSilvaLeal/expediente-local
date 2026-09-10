@@ -103,6 +103,21 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
     padding:12px; overflow:auto; font-size:12px; max-height:320px}
 .pregunta{border-left:2px solid var(--gold); padding-left:12px; margin:10px 0}
 .pregunta b{color:var(--gold); font-weight:600; font-size:12px}
+
+/* El conflicto es lo único de la interfaz donde alguien ESCRIBE. Todo lo demás
+   se lee. Por eso es lo único que lleva controles de formulario. */
+.conflicto{border-top:1px solid var(--linea); padding-top:12px; margin-top:12px}
+.conflicto:first-of-type{border-top:0; padding-top:0; margin-top:0}
+.opcion{display:flex; gap:9px; align-items:flex-start; padding:7px 0; cursor:pointer}
+.opcion input{margin-top:4px; accent-color:var(--mint)}
+.campo{display:block; width:100%; margin-top:8px; padding:8px 10px;
+       background:#0B1018; color:var(--texto); font:inherit; font-size:13px;
+       border:1px solid var(--borde); border-radius:6px}
+.campo:focus{outline:0; border-color:var(--mint)}
+.btn{margin-top:10px; padding:8px 14px; font:inherit; font-size:13px; font-weight:600;
+     color:#06251F; background:var(--mint); border:0; border-radius:6px; cursor:pointer}
+.btn:disabled{opacity:.5; cursor:default}
+.error{color:var(--coral); font-size:12.5px; margin-top:8px; line-height:1.45}
 </style>
 </head>
 <body>
@@ -243,17 +258,36 @@ async function abrirExpediente (id) {
 
     ${(e.conflictos || []).length ? `<div class="tarjeta hueco">
       <h2>⚔ Dos fuentes se contradicen</h2>
-      <p class="aviso" style="padding-top:0">el sistema no elige ni promedia: lo decide una persona</p>
+      <p class="aviso" style="padding-top:0">
+        El sistema no elige ni promedia, y no deja firmar hasta que se resuelva.
+        Elige el valor que respalda el documento que tienes delante.
+      </p>
+      ${e.conflictos.map((c, i) => `
+        <div class="conflicto" data-ruta="${esc(c.ruta)}">
+          <div class="ruta mono" style="margin-bottom:8px">${esc(c.ruta)}</div>
+          ${[[c.asentado, c.citaAsentada, 'ya asentado'], [c.propuesto, c.citaPropuesta, 'la otra fuente']]
+            .map(([v, cita, etiq], j) => `
+            <label class="opcion">
+              <input type="radio" name="c${i}" value="${esc(v)}"${j === 0 ? ' checked' : ''}>
+              <span><b>${esc(v)}</b> <span class="motivo">— ${etiq}</span>
+                <div class="cita">«${esc(cita)}»</div></span>
+            </label>`).join('')}
+          <input class="campo" data-of type="text" placeholder="Quién resuelve — nombre y cargo">
+          <input class="campo" data-mot type="text" placeholder="Por qué: qué documento tienes delante que el sistema no puede ver">
+          <button class="btn" data-i="${i}">Resolver y firmar la decisión</button>
+          <div class="error" hidden></div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    ${(e.resoluciones || []).length ? `<div class="tarjeta">
+      <h2>Conflictos ya resueltos</h2>
       <table>
-        ${e.conflictos.map(c => `
+        ${e.resoluciones.map(r => `
           <tr>
-            <td class="ruta mono">${esc(c.ruta)}</td>
-            <td>
-              <div><b>${esc(c.asentado)}</b> <span class="motivo">— asentado</span>
-                <div class="cita">«${esc(c.citaAsentada)}»</div></div>
-              <div style="margin-top:6px"><b>${esc(c.propuesto)}</b> <span class="motivo">— propuesto</span>
-                <div class="cita">«${esc(c.citaPropuesta)}»</div></div>
-            </td>
+            <td class="ruta mono">${esc(r.ruta)}</td>
+            <td><b>${esc(r.valor)}</b>
+              <div class="motivo">descartado: ${esc(r.descartado)} · ${esc(r.oficial || '—')}</div>
+              <div class="cita">«${esc(r.motivo || '')}»</div></td>
           </tr>`).join('')}
       </table>
     </div>` : ''}
@@ -286,6 +320,56 @@ async function abrirExpediente (id) {
       <h2>Dataset exportable · con columna de auditoría</h2>
       <pre>${esc(d.csv)}</pre>
     </div>`
+
+  cablearConflictos(e.id)
+}
+
+// ── EL ÚNICO SITIO DE LA INTERFAZ QUE ESCRIBE ──────────────────────────────
+//
+// La validación NO se repite aquí. El servidor la delega en core/expediente.mjs,
+// y lo que este código hace con un error es ENSEÑARLO, no anticiparlo: si la
+// interfaz validara por su cuenta, tarde o temprano diría algo distinto que el
+// núcleo, y la que manda es la del núcleo.
+function cablearConflictos (id) {
+  for (const caja of document.querySelectorAll('.conflicto')) {
+    const boton = caja.querySelector('.btn')
+    const error = caja.querySelector('.error')
+
+    boton.addEventListener('click', async () => {
+      const elegido = caja.querySelector('input[type=radio]:checked')
+      const cuerpo = {
+        campo: caja.dataset.ruta,
+        valor: elegido ? elegido.value : null,
+        oficial: caja.querySelector('[data-of]').value,
+        motivo: caja.querySelector('[data-mot]').value
+      }
+
+      boton.disabled = true
+      error.hidden = true
+      try {
+        const r = await fetch('/api/resolver/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(cuerpo)
+        })
+        const d = await r.json()
+        if (!d.ok) {
+          // El mensaje del núcleo se enseña TAL CUAL. Está escrito para que lo
+          // lea una persona, y reescribirlo aquí sería perder el porqué.
+          error.textContent = d.error
+          error.hidden = false
+          boton.disabled = false
+          return
+        }
+        await abrirExpediente(id)
+        await cargarLista()
+      } catch (e) {
+        error.textContent = e.message
+        error.hidden = false
+        boton.disabled = false
+      }
+    })
+  }
 }
 
 cargarLista()

@@ -225,3 +225,61 @@ test('T3-21 · los decimales anclan con punto o con coma', () => {
   assert.ok(valorEstaEnCita(1250,  'salario de 1250 al mes'))
   assert.ok(!valorEstaEnCita(45.31, 'por 45.30 balboas'), 'un céntimo de diferencia es otro monto')
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  T3-22 · ⭐ LA CITA TIENE FRONTERA: el fallo más grave que tuvo el proyecto
+//
+//  `citaEstaEnFuente` era `f.includes(c)`, e `includes` no exige frontera.
+//  Lo encontró una auditoría adversarial; la suite entera pasaba con el bug
+//  dentro, y el propio banco de casos trampa —que se anuncia como «uno por
+//  cada forma CONOCIDA de que un dato malo entre»— no lo tenía.
+//
+//  El escenario: la fuente dice 4500 balboas y el modelo devuelve 500 con la
+//  cita «500 balboas». Es sufijo literal, así que anclaba. Y no lo paraba
+//  ninguna guardia posterior: G4, que comprueba unidades, veía la palabra
+//  «balboas» DENTRO de la subcadena y daba por bueno el monto.
+//
+//  Lo que lo hace grave de verdad es que ese es EL fallo que este archivo
+//  existe para impedir. Y que el mismo patrón ya estaba resuelto en G4, con
+//  un comentario que dice «se compara por PALABRA COMPLETA, no por substring»:
+//  se corrigió donde alguien lo midió, no donde importaba más.
+// ═══════════════════════════════════════════════════════════════════════════
+test('T3-22 · ⭐ una cita que es sufijo de otra cifra NO ancla', () => {
+  const fuente = 'Carta laboral de Distribuidora Global. El salario mensual es de 4500 balboas.'
+
+  assert.ok(!citaEstaEnFuente('500 balboas', fuente),
+    'un monto que la fuente nunca dijo no entra por ser sufijo de uno que sí')
+  assert.ok(citaEstaEnFuente('4500 balboas', fuente),
+    'y el monto que la fuente SÍ dice sigue anclando')
+
+  // La clave natural, que es donde más duele: un dígito de menos creaba un
+  // segundo expediente de la misma persona.
+  assert.ok(!citaEstaEnFuente('cedula 8-123-456', 'Cedula 8-123-45678 de Ana Ruiz'),
+    'una cédula truncada no ancla contra la completa')
+  assert.ok(!citaEstaEnFuente('8-123-456', 'la cedula 18-123-4567 consta'),
+    'ni recortada por el principio')
+
+  // Prefijo y sufijo de PALABRA, no solo de número.
+  assert.ok(!citaEstaEnFuente('Pérez', 'El titular es Juan Pérezoso Gómez'),
+    'un apellido no ancla dentro de otra palabra')
+  assert.ok(citaEstaEnFuente('Pérez', 'El titular es Juan Pérez González'),
+    'pero sí cuando la palabra está completa')
+
+  // Y lo legítimo sigue funcionando: la normalización es la razón por la que
+  // esta función no puede ser una simple igualdad.
+  assert.ok(citaEstaEnFuente('Juan Pérez González', 'El titular es JUAN PEREZ GONZALEZ'),
+    'tildes y mayúsculas siguen sin importar')
+  assert.ok(citaEstaEnFuente('45.30 balboas', 'por 45.30 balboas'),
+    'la puntuación sigue sin importar')
+  assert.ok(citaEstaEnFuente('8-123-456', 'cédula 8-123-456, emitida en 2020'),
+    'y una cita al final de la frase, seguida de coma, sigue anclando')
+})
+
+test('T3-23 · se buscan TODAS las apariciones, no solo la primera', () => {
+  // Una cita puede salir a mitad de palabra en un sitio y bien delimitada en
+  // otro. Si solo se mirase la primera aparición, la fuente diría el dato y el
+  // sistema lo negaría — un hueco donde no lo hay, que es el error contrario
+  // y también hace daño: el oficial repregunta por algo que ya tiene delante.
+  assert.ok(citaEstaEnFuente('500 balboas', 'Anticipo de 4500 balboas y saldo de 500 balboas.'),
+    'la segunda aparición sí tiene frontera y la fuente sí lo dice')
+})

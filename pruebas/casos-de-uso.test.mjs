@@ -27,6 +27,7 @@ import { abrirExpediente, aCsv } from '../core/expediente.mjs'
 import { ORIGENES } from '../core/estado.mjs'
 import { leer } from '../core/ledger.mjs'
 import { calidad } from '../core/calidad.mjs'
+import { proyectar } from '../core/proyeccion.mjs'
 import { RECHAZO } from '../core/guardias.mjs'
 import { revisarDominio } from '../instancias/banca/guardias.mjs'
 
@@ -857,5 +858,105 @@ test('CU-24 · ⭐ no se aprueba ni se rechaza sin decir quién firma', () => {
     const evento = leer(ruta).find(h => h.tipo === 'DECISION_HUMANA')
     assert.equal(evento.oficial, 'A. Ruiz · oficial de cuenta · suc. Vía España')
     assert.ok(exp.verificar().intacta, 'la cadena sigue íntegra')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CU-25 · ⭐ EL HUMANO EN EL BUCLE: la única salida de un conflicto
+//
+//  CU-23 dejó el expediente parado y protegido, y con eso a medias: parar sin
+//  dar salida no es cautela, es un callejón. El titular quedaba en disputa,
+//  sin poder cerrarse ni firmarse, para siempre — y en una sucursal eso
+//  significa un cliente que se va.
+//
+//  La salida existe y es deliberadamente humana. Y tiene tres candados que no
+//  se abren ni para el oficial:
+//
+//    · el valor elegido tiene que ser uno de los dos que ya están, cada uno con
+//      su cita. Ni una persona puede asentar un dato que ninguna fuente diga.
+//    · quién resuelve, porque una resolución anónima no se reconstruye.
+//    · por qué, porque un supervisor dentro de cuatro años necesita saber qué
+//      vio el oficial que el sistema no podía ver.
+// ═══════════════════════════════════════════════════════════════════════════
+test('CU-25 · ⭐ una persona zanja el conflicto, y solo entonces se puede firmar', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-resolver-'))
+  const ruta = join(dir, 'e.jsonl')
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta, esquema: ESQ, id: 'EXP-R',
+      ahora: () => `2026-09-11T01:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+
+    const doc = { tipo: 'RECIBO_SERVICIO',
+      emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
+      fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
+      monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }
+
+    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
+    exp.asentar({ titular: {
+      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
+      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [doc] })
+
+    exp.capturar('Según la carta laboral el titular es María Gómez Batista, cédula 8-123-456.')
+    exp.asentar({ titular: {
+      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' },
+      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [] })
+
+    assert.equal(exp.leer().conflictos.length, 1)
+
+    // ── LOS TRES CANDADOS ──────────────────────────────────────────────────
+    const hechosAntes = leer(ruta).length
+
+    assert.throws(() => exp.resolver('titular.nombre', {
+      valor: 'Pedro Ramírez Him', oficial: 'A. Ruiz', motivo: 'me suena mejor'
+    }), /no es ninguno de los dos valores en disputa/,
+      'ni una persona puede asentar un dato que ninguna fuente afirma')
+
+    assert.throws(() => exp.resolver('titular.nombre', {
+      valor: 'María Gómez Batista', motivo: 'la cédula coincide'
+    }), /exige identificar al oficial/, 'una resolución anónima no se reconstruye')
+
+    assert.throws(() => exp.resolver('titular.nombre', {
+      valor: 'María Gómez Batista', oficial: 'A. Ruiz'
+    }), /exige motivo/, 'sin el porqué, «lo decidió alguien» no es auditable')
+
+    assert.throws(() => exp.resolver('titular.cedula', {
+      valor: '8-123-456', oficial: 'A. Ruiz', motivo: 'x'
+    }), /no está en conflicto/, 'no se resuelve lo que nadie discute')
+
+    assert.equal(leer(ruta).length, hechosAntes,
+      'y ninguno de los cuatro intentos dejó rastro en el ledger')
+
+    // ── LA RESOLUCIÓN ──────────────────────────────────────────────────────
+    const tras = exp.resolver('titular.nombre', {
+      valor: 'María Gómez Batista',
+      oficial: 'A. Ruiz · oficial de cuenta · suc. Vía España',
+      motivo: 'La cédula física presentada en ventanilla coincide con la carta laboral.'
+    })
+
+    assert.equal(tras.conflictos.length, 0, 'el conflicto queda cerrado')
+    assert.equal(tras.campos['titular.nombre'].valor, 'María Gómez Batista')
+    assert.equal(tras.campos['titular.nombre'].cita, 'el titular es María Gómez Batista',
+      'el valor viaja con la cita de SU documento, no con la del que desplazó')
+
+    // La evidencia BAJA: una decisión humana entre dos documentos es un dato
+    // bien fundado, no un dato mejor probado.
+    assert.equal(tras.campos['titular.nombre'].evidencia, 'Reportado')
+
+    const r = tras.resoluciones.at(-1)
+    assert.equal(r.descartado, 'Juan Pérez González', 'lo descartado queda escrito, no se borra')
+    assert.equal(r.oficial, 'A. Ruiz · oficial de cuenta · suc. Vía España')
+
+    // ── Y SOLO ENTONCES SE FIRMA ───────────────────────────────────────────
+    const final = exp.decidir('aprobar', {
+      motivo: 'Resolución revisada y conforme.', oficial: 'R. Him · gerente de sucursal'
+    })
+    assert.equal(final.estado, 'APROBADO')
+    assert.ok(exp.verificar().intacta, 'la cadena aguanta todo el recorrido')
+
+    // Y el expediente se sigue regenerando del ledger: la resolución es un
+    // hecho más, no un parche sobre el estado.
+    assert.deepEqual(proyectar(leer(ruta)).campos, final.campos)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

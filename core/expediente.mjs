@@ -207,6 +207,60 @@ export function abrirExpediente ({
       return this.leer()
     },
 
+    /**
+     * ⭐ Una persona zanja un conflicto entre dos fuentes.
+     *
+     * Es la única salida de un conflicto, y es deliberadamente humana: el
+     * sistema detecta que dos documentos se contradicen y ahí se detiene,
+     * porque cuál de los dos vale no es una pregunta que se pueda resolver
+     * leyendo los papeles — se resuelve mirando a la persona que los trajo.
+     *
+     * Tres cosas son obligatorias, y ninguna es negociable:
+     *
+     *   · el VALOR tiene que ser uno de los dos en disputa. Ni siquiera el
+     *     oficial puede introducir un dato que ninguna fuente diga. Si el valor
+     *     correcto es un tercero, hay que capturar el documento que lo dice.
+     *   · el OFICIAL, porque una resolución anónima no se puede reconstruir.
+     *   · el MOTIVO, porque «lo decidió alguien» sin el porqué no es auditable:
+     *     un supervisor que revise esto dentro de cuatro años necesita saber
+     *     qué vio el oficial que el sistema no podía ver.
+     */
+    resolver (rutaCampo, { valor, oficial = null, motivo = null } = {}) {
+      const exp = proyectar(leer(ruta))
+      const conflicto = (exp.conflictos ?? []).find(c => c.ruta === rutaCampo)
+      if (!conflicto) {
+        const abiertos = (exp.conflictos ?? []).map(c => c.ruta)
+        throw new Error(
+          `"${rutaCampo}" no está en conflicto. ` +
+          (abiertos.length ? `En conflicto están: ${abiertos.join(', ')}.` : 'No hay ningún conflicto abierto.'))
+      }
+      if (valor === undefined || valor === null || String(valor).trim() === '') {
+        throw new Error('Resolver exige elegir un valor: no hay resolución implícita')
+      }
+      const opciones = [conflicto.asentado, conflicto.propuesto]
+      if (!opciones.some(v => String(v) === String(valor))) {
+        throw new Error(
+          `«${valor}» no es ninguno de los dos valores en disputa para ${rutaCampo}. ` +
+          `Son «${conflicto.asentado}» y «${conflicto.propuesto}». ` +
+          'Si el valor correcto es otro, hace falta el documento que lo diga: ' +
+          'ni una persona puede asentar un dato que ninguna fuente afirma.')
+      }
+      if (!oficial || !String(oficial).trim()) {
+        throw new Error('Resolver exige identificar al oficial: una resolución anónima no se puede reconstruir')
+      }
+      if (!motivo || !String(motivo).trim()) {
+        throw new Error(
+          'Resolver exige motivo. Quien revise esto dentro de cuatro años necesita ' +
+          'saber qué vio el oficial que el sistema no podía ver.')
+      }
+
+      hecho(EVENTO.RESOLUCION_HUMANA, {
+        origen: ORIGENES.HUMANO, motivo, oficial: String(oficial).trim(),
+        datos: { ruta: rutaCampo, valor: String(valor) === String(conflicto.asentado) ? conflicto.asentado : conflicto.propuesto }
+      })
+      return this.leer()
+    },
+
     /** Enlaza con otro expediente. NO borra: borrar destruiría la evidencia. */
     marcarDuplicado (deId, motivo, { origen = ORIGENES.REGLA } = {}) {
       if (!motivo) throw new Error('Marcar un duplicado exige motivo')

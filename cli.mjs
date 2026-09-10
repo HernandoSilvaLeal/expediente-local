@@ -45,6 +45,8 @@ const { values: op, positionals } = parseArgs({
     modelo:     { type: 'string' },
     proveedor:  { type: 'string' },   // clave pública del par que tiene la GPU
     oficial:    { type: 'string' },   // quién firma. Sin esto no se aprueba ni se rechaza
+    campo:      { type: 'string' },   // qué campo se resuelve
+    valor:      { type: 'string' },   // cuál de los dos valores en disputa gana
     salida:     { type: 'string' },
     hoy:        { type: 'string' },   // fija el reloj: ver abajo
     json:       { type: 'boolean', default: false },
@@ -138,6 +140,7 @@ async function ejecutar (cmd) {
     case 'csv':        return csv()
     case 'verificar':  return verificar()
     case 'hechos':     return hechos()
+    case 'resolver':   return resolverConflicto()
     case 'aprobar':    return decidir('aprobar')
     case 'rechazar':   return decidir('rechazar')
     default:
@@ -232,6 +235,49 @@ function hechos () {
                 `${C}${h.tipo.padEnd(16)}${N} ${G}${h.origen}${h.motivo ? ` · ${h.motivo}` : ''}${N}`)
   }
   console.log('')
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  resolver — ⭐ la salida del conflicto, y solo la tiene una persona
+// ═══════════════════════════════════════════════════════════════════════════
+
+function resolverConflicto () {
+  const e = exp.leer()
+  const abiertos = e.conflictos ?? []
+
+  // Sin --campo, se enseña qué hay que resolver y con qué comando. Un error que
+  // no dice cuál es el siguiente comando obliga a leer el README a mitad de una
+  // demostración, y eso es tiempo muerto delante de quien está evaluando.
+  if (!op.campo) {
+    if (!abiertos.length) {
+      console.log(`\n  ${G}No hay ningún conflicto abierto en ${e.id}.${N}\n`)
+      return
+    }
+    console.log(`\n  ${B}${A}⚔ ${abiertos.length === 1 ? 'UN CONFLICTO ABIERTO' : `${abiertos.length} CONFLICTOS ABIERTOS`}${N}` +
+                `   ${G}elige una persona, y queda firmado${N}`)
+    for (const c of abiertos) {
+      console.log(`\n     ${A}⚔${N} ${B}${c.ruta}${N}`)
+      console.log(`        ${C}«${c.asentado}»${N}   ${G}← ${c.citaAsentada}${N}`)
+      console.log(`        ${C}«${c.propuesto}»${N}   ${G}← ${c.citaPropuesta}${N}`)
+      console.log(`\n        ${G}node cli.mjs resolver --ledger ${ruta} \\${N}`)
+      console.log(`        ${G}  --campo ${c.ruta} --valor "${c.asentado}" \\${N}`)
+      console.log(`        ${G}  --oficial "quién" --texto "qué documento lo respalda"${N}`)
+    }
+    console.log()
+    return
+  }
+
+  const tras = exp.resolver(op.campo, {
+    valor: op.valor, oficial: op.oficial ?? null, motivo: op.texto ?? null
+  })
+  const r = tras.resoluciones.at(-1)
+  console.log(`\n  ${V}✓${N} ${B}${r.ruta}${N} queda como ${C}«${r.valor}»${N}`)
+  console.log(`     ${G}descartado: «${r.descartado}»${N}`)
+  console.log(`     ${G}${r.oficial}  ·  «${r.motivo}»${N}`)
+  const quedan = (tras.conflictos ?? []).length
+  console.log(quedan
+    ? `\n  ${A}quedan ${quedan} conflictos por resolver${N}\n`
+    : `\n  ${G}sin conflictos abiertos: el expediente ya puede cerrarse${N}\n`)
 }
 
 function decidir (que) {

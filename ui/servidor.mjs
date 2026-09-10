@@ -97,6 +97,28 @@ const servidor = createServer(async (req, res) => {
       })
     }
 
+    // ⭐ Resolver un conflicto entre fuentes: el humano en el bucle, desde el
+    // navegador. Las tres reglas —valor de la disputa, oficial, motivo— viven
+    // en core/expediente.mjs y NO se repiten aquí: si se validara también en el
+    // servidor, tarde o temprano las dos copias dirían cosas distintas.
+    if (url.pathname.startsWith('/api/resolver/') && req.method === 'POST') {
+      const id = decodeURIComponent(url.pathname.split('/').pop())
+      const cuerpo = await leerCuerpo(req)
+      const exp = abrirExpediente({
+        ruta: join(DATOS, `${id}.jsonl`), esquema, id,
+        guardiasDominio: dominio.revisar, guardiasRegistro: dominio.revisarRegistro,
+        contextoDominio: dominio.contexto
+      })
+      try {
+        const e = exp.resolver(cuerpo.campo, {
+          valor: cuerpo.valor, oficial: cuerpo.oficial ?? null, motivo: cuerpo.motivo ?? null
+        })
+        return enviar(200, { ok: true, conflictos: e.conflictos.length })
+      } catch (err) {
+        return enviar(409, { ok: false, error: err.message })
+      }
+    }
+
     // Las decisiones que solo puede tomar una persona pasan por aquí, y por
     // ningún otro sitio: la política vive en core/estado.mjs, no en el navegador.
     if (url.pathname.startsWith('/api/decidir/') && req.method === 'POST') {

@@ -74,11 +74,11 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **313 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **316 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
-| Que **cada guardia** hace su trabajo | `npm run casos` | **13 casos trampa**, cobertura G1..G8 |
+| Que **cada guardia** hace su trabajo | `npm run casos` | **15 casos trampa**, cobertura G1..G8 |
 | Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
 | **Los datos de ejemplo** | `npm run demo` | tres expedientes sembrados en 2 s: uno limpio, uno con invenciones, uno en conflicto |
@@ -167,6 +167,52 @@ nombre del oficial rompe `npm run verify:invariantes`:
 Rechazarlo sí se permite: cerrar un expediente contradictorio es exactamente lo
 que un oficial debe poder hacer. Fijado por **CU-19** y **CU-23**.
 
+### 🧑 Y la salida del conflicto es una persona — el humano en el bucle
+
+Parar sin dar salida no es cautela: es un callejón, y en una sucursal significa
+un cliente que se va. El sistema detecta la contradicción y **se detiene ahí**,
+porque cuál de los dos documentos vale no se resuelve leyendo los papeles: se
+resuelve mirando a quien los trajo.
+
+El comando sin argumentos enseña qué hay que resolver **y el comando exacto
+para hacerlo**:
+
+```bash
+node cli.mjs resolver --ledger datos/EXP-003.jsonl
+#  ⚔ UN CONFLICTO ABIERTO   elige una persona, y queda firmado
+#     ⚔ titular.nombre
+#        «Juan Pérez González»   ← El titular es Juan Pérez González
+#        «María Gómez Batista»   ← el titular es María Gómez Batista
+```
+
+**Tres candados, y no se abren ni para el oficial:**
+
+```bash
+node cli.mjs resolver --ledger datos/EXP-003.jsonl \
+  --campo titular.nombre --valor "Pedro Ramírez Him" \
+  --oficial "A. Ruiz" --texto "me suena mejor"
+#  ✗ «Pedro Ramírez Him» no es ninguno de los dos valores en disputa. Si el valor
+#    correcto es otro, hace falta el documento que lo diga: ni una persona puede
+#    asentar un dato que ninguna fuente afirma.
+```
+
+| El candado | Por qué existe |
+|---|---|
+| El **valor** es uno de los dos que ya están, con su cita | ni el humano introduce un dato sin fuente. Esa regla no tiene excepción |
+| El **oficial**, obligatorio | una resolución anónima no se puede reconstruir |
+| El **motivo**, obligatorio | un supervisor dentro de cuatro años necesita saber qué vio el oficial que el sistema no podía ver |
+
+Resuelto, el campo se queda con **la cita de su propio documento** y la evidencia
+**baja a Reportado**: una decisión humana entre dos documentos es un dato bien
+fundado, no un dato mejor probado. Lo descartado **no se borra** — queda escrito
+junto a quién lo descartó y por qué.
+
+Es uno de los dos únicos eventos que pueden bajar el grado de evidencia de un
+campo, y los dos los firma una persona. Fijado por **CU-25** y **T5-E03**.
+
+También se hace desde la interfaz: es **el único sitio de toda la página donde
+alguien escribe**. Todo lo demás se lee.
+
 Y el expediente **no se puede aprobar** tampoco cuando le falta un campo crítico:
 
 ```bash
@@ -219,7 +265,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 313 tests, sin modelo y sin red
+npm test                  # 316 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -234,7 +280,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **313/313** | 1 s |
+| `npm test` → **316/316** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
@@ -298,7 +344,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **313 / 313** verdes, sin modelo y sin red |
+| Tests | **316 / 316** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **~62 %** |
 | Casos de uso punta a punta | **18** |
 | Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G8 |

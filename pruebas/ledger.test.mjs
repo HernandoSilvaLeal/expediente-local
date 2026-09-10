@@ -365,8 +365,15 @@ test('T5-E02 · la evidencia NO baja por una observación peor: O3', () => {
     'una observación con menos respaldo no degrada lo que ya estaba probado')
 })
 
-test('T5-E03 · CONTRADICCION es el ÚNICO evento que baja la evidencia: O4', () => {
-  assert.deepEqual([...BAJA_EVIDENCIA], [EVENTO.CONTRADICCION])
+test('T5-E03 · SOLO DOS eventos bajan la evidencia, y los dos los firma una persona: O4', () => {
+  // La lista es cerrada y se comprueba entera: si alguien añade un tercer
+  // evento capaz de degradar un campo, este test cae y hay que justificarlo.
+  //
+  // Son dos y no uno porque zanjar un conflicto entre fuentes puede significar
+  // quedarse con el valor MENOS respaldado: el oficial que tiene los dos
+  // documentos delante sabe cosas que el sistema no puede saber. Que pueda
+  // hacerlo es el punto; que quede escrito con su nombre y su motivo, el precio.
+  assert.deepEqual([...BAJA_EVIDENCIA], [EVENTO.CONTRADICCION, EVENTO.RESOLUCION_HUMANA])
   const e = proyectar(conHashes([
     TRES[0],
     revision(T(2), [{ ruta: 'titular.nombre', aceptado: true, valor: 'Juan Pérez', cita: 'c', evidencia: 'Confirmado' }]),

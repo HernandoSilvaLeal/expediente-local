@@ -76,13 +76,53 @@ export function normalizar (s) {
 
 /**
  * ¿Está esta cita, literalmente, en la fuente?
+ *
+ * ── EL FALLO MÁS GRAVE QUE HA TENIDO ESTE PROYECTO ─────────────────────────
+ *
+ * Esta función era `f.includes(c)`, y `includes` no exige frontera. Medido:
+ *
+ *   fuente:    «El salario mensual es de 4500 balboas»
+ *   propuesta: { valor: 500, cita: "500 balboas" }
+ *   resultado: ANCLADO ✅  ← «500 balboas» es sufijo de «4500 balboas»
+ *
+ * Un monto que la fuente NUNCA dijo entraba al expediente firmado, pasaba
+ * G1..G5 y las de dominio —G4 incluida, porque la palabra «balboas» viaja
+ * DENTRO de la subcadena—, y el expediente llegaba a COMPLETO con la columna
+ * de guardias vacía. Con un afirmador cerca («la carta dice un salario de
+ * 1500 balboas») salía además como **Confirmado**, el grado máximo.
+ *
+ * Y en la cédula, que es la CLAVE NATURAL: el modelo trunca un dígito,
+ * «8-123-456» ancla contra «8-123-45678», G6 la valida estructuralmente, y
+ * dedup crea un SEGUNDO expediente de la misma persona.
+ *
+ * Es exactamente la alucinación que este archivo existe para impedir. La
+ * ironía es que el patrón ya estaba resuelto trece líneas más allá, en G4 de
+ * `core/guardias.mjs`: «Se compara por PALABRA COMPLETA, no por substring».
+ * Se corrigió allí, donde se midió, y no aquí, donde nadie lo probó.
+ *
+ * Ahora la cita tiene que aparecer con FRONTERA a los dos lados. Como
+ * `normalizar()` deja solo letras, números y espacios simples, la frontera es
+ * el espacio o el borde de la cadena — no hace falta una expresión regular
+ * construida a partir de la cita, que además habría que escapar.
+ *
  * @returns {boolean}
  */
 export function citaEstaEnFuente (cita, fuente) {
   const c = normalizar(cita)
   const f = normalizar(fuente)
   if (!c || !f) return false
-  return f.includes(c)
+
+  // Se recorren TODAS las apariciones, no solo la primera: una cita puede salir
+  // a mitad de palabra en un sitio y bien delimitada en otro, y en ese caso la
+  // fuente sí la dice.
+  for (let desde = 0; ; desde++) {
+    const i = f.indexOf(c, desde)
+    if (i === -1) return false
+    const abre = i === 0 || f[i - 1] === ' '
+    const cierra = i + c.length === f.length || f[i + c.length] === ' '
+    if (abre && cierra) return true
+    desde = i
+  }
 }
 
 /**

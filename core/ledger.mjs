@@ -46,16 +46,23 @@ export const EVENTO = Object.freeze({
   TRANSICION:      'TRANSICION',       // cambió el estado del registro
   CONTRADICCION:   'CONTRADICCION',    // una observación contradice a otra
   DUPLICADO:       'DUPLICADO',        // es otro expediente ya existente
-  DECISION_HUMANA: 'DECISION_HUMANA'   // una persona aprobó o rechazó
+  DECISION_HUMANA: 'DECISION_HUMANA',  // una persona aprobó o rechazó
+  RESOLUCION_HUMANA: 'RESOLUCION_HUMANA' // una persona zanjó un conflicto entre fuentes
 })
 
 /**
- * `CONTRADICCION` es el único evento que puede BAJAR el grado de evidencia de un
- * campo. Es el invariante O4 hecho mecanismo: la evidencia no baja en silencio,
- * baja dejando escrito qué la contradijo. Sin este evento, `promover()` solo sube
- * y no habría forma legítima de corregir a la baja.
+ * `CONTRADICCION` y `RESOLUCION_HUMANA` son los únicos eventos que pueden BAJAR
+ * el grado de evidencia de un campo. Es el invariante O4 hecho mecanismo: la
+ * evidencia no baja en silencio, baja dejando escrito qué la contradijo y quién
+ * lo dijo. Sin ellos, `promover()` solo sube y no habría forma legítima de
+ * corregir a la baja.
+ *
+ * `RESOLUCION_HUMANA` está aquí porque zanjar un conflicto puede significar
+ * quedarse con el valor MENOS respaldado de los dos: el oficial que ve los dos
+ * documentos sabe cosas que el sistema no. Que pueda hacerlo es el punto; que
+ * quede escrito con su nombre y su motivo es el precio.
  */
-export const BAJA_EVIDENCIA = Object.freeze([EVENTO.CONTRADICCION])
+export const BAJA_EVIDENCIA = Object.freeze([EVENTO.CONTRADICCION, EVENTO.RESOLUCION_HUMANA])
 
 export class LedgerCorrupto extends Error {
   constructor (seq, detalle) {

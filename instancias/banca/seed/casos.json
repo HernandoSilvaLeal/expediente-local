@@ -564,6 +564,90 @@
         ]
       },
       "$por_que": "Los tres campos anclan perfectamente: los tres números están en el texto. Lo que está mal no es ningún campo, es la RELACIÓN entre ellos. Por eso G8 es una guardia de REGISTRO y no de campo. Y se marca el TOTAL, no los tres: marcar los tres no dice nada, porque alguno es correcto y el operador tendría que adivinar cuál."
+    },
+    {
+      "id": "C14",
+      "titulo": "⭐ EL MONTO QUE NADIE DIJO — la cita que es sufijo de otra cifra",
+      "medido": false,
+      "guardia": "G3",
+      "$por_que": "El fallo más grave que ha tenido este proyecto, y lo encontró una auditoría adversarial, no la suite. `citaEstaEnFuente` comparaba con `includes`, que no exige frontera: «500 balboas» es sufijo literal de «4500 balboas», así que un monto que la fuente NUNCA dijo anclaba y entraba firmado. Pasaba todas las guardias —G4 incluida, porque la palabra «balboas» viaja DENTRO de la subcadena— y el expediente llegaba a COMPLETO con la columna de guardias vacía. Con un afirmador cerca salía además como Confirmado, el grado máximo. La ironía: el patrón ya estaba resuelto en G4 («se compara por PALABRA COMPLETA, no por substring»), donde alguien lo midió. En la regla de oro, que es el corazón del proyecto, nadie lo había probado.",
+      "fuente": "Carta laboral de Distribuidora Global. El salario mensual es de 4500 balboas. Titular Ana Ruiz, cedula 8-123-456, emitida el 3 de agosto de 2026.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Ana Ruiz",
+            "cita": "Titular Ana Ruiz"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "cedula 8-123-456"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "CARTA_LABORAL",
+            "emisor": {
+              "valor": "Distribuidora Global",
+              "cita": "Carta laboral de Distribuidora Global"
+            },
+            "fecha_emision": {
+              "valor": "3 de agosto de 2026",
+              "cita": "emitida el 3 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 500,
+              "cita": "500 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].monto"
+        ]
+      }
+    },
+    {
+      "id": "C15",
+      "titulo": "⭐ LA CÉDULA TRUNCADA — un dígito de menos crea una segunda persona",
+      "medido": false,
+      "guardia": "G3",
+      "$por_que": "El mismo fallo de frontera, pero sobre la CLAVE NATURAL, que es donde de verdad duele. El modelo se come el último dígito: «8-123-456» contra una fuente que dice «8-123-45678». Anclaba, G6 lo validaba estructuralmente —provincia 8 existe, tomo y asiento en rango— y dedup devolvía DISTINTO, creando un SEGUNDO expediente de la misma persona. Dos expedientes del mismo cliente no es un dato sucio: es un hueco de debida diligencia, porque cada mitad se revisa contra la mitad de la información.",
+      "fuente": "Cedula 8-123-45678 de Ana Ruiz. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Ana Ruiz",
+            "cita": "de Ana Ruiz"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "Cedula 8-123-456"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 45.3,
+              "cita": "por 45.30 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "titular.cedula"
+        ]
+      }
     }
   ]
 }

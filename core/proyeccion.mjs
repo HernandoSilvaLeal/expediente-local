@@ -66,6 +66,7 @@ export function proyectar (eventos) {
     duplicadoDe: null,
     contradicciones: [],
     conflictos: [],
+    resoluciones: [],
     decisiones: [],
     historial: []
   }
@@ -129,6 +130,60 @@ function aplicar (exp, e) {
       }
       exp.estado = hacia
       exp.historial.push({ seq: e.seq, ts: e.ts, hacia, origen: e.origen, motivo: e.motivo })
+      break
+    }
+
+    case EVENTO.RESOLUCION_HUMANA: {
+      // ── LA SALIDA DEL CONFLICTO, Y SOLO LA TIENE UNA PERSONA ───────────────
+      //
+      // Sin esto, un conflicto era una condena: el expediente quedaba con el
+      // titular en disputa, sin poder cerrarse ni firmarse, para siempre. El
+      // sistema paraba y no ofrecía puerta. Parar sin dar salida no es cautela:
+      // es un callejón, y en una sucursal significa un cliente que se va.
+      //
+      // Quien resuelve NO inventa un valor: elige entre los que ya están, cada
+      // uno con su cita en su documento. Ni siquiera el oficial puede meter un
+      // dato que ninguna fuente diga — esa regla no tiene excepción humana, y
+      // es exactamente la que hace que el expediente siga siendo reconstruible.
+      const ruta = e.datos.ruta
+      const idx = exp.conflictos.findIndex(c => c.ruta === ruta)
+      if (idx === -1) {
+        throw new LedgerIncoherente(e.seq, `resuelve "${ruta}", que no está en conflicto`)
+      }
+      const conflicto = exp.conflictos[idx]
+      const elegido = e.datos.valor
+
+      // El valor tiene que ser uno de los dos en disputa. Si no, el ledger
+      // describe algo que no pudo pasar por la aplicación, y eso se dice.
+      const opciones = [conflicto.asentado, conflicto.propuesto]
+      if (!opciones.some(v => String(v) === String(elegido))) {
+        throw new LedgerIncoherente(e.seq,
+          `resuelve "${ruta}" con «${elegido}», que no es ninguno de los dos valores en disputa`)
+      }
+
+      const gana = String(elegido) === String(conflicto.asentado)
+      exp.conflictos.splice(idx, 1)
+      exp.resoluciones.push({
+        seq: e.seq, ts: e.ts, ruta,
+        valor: elegido, descartado: gana ? conflicto.propuesto : conflicto.asentado,
+        oficial: e.oficial ?? null, motivo: e.motivo
+      })
+
+      // Si el oficial se queda con lo ya asentado, no hay nada que mover: el
+      // campo se queda como está, con su cita y su evidencia.
+      if (gana) break
+
+      // Y si elige el propuesto, el campo cambia — pero baja a Reportado y no
+      // hereda el grado del que desplazó. Una decisión humana entre dos
+      // documentos es un dato bien fundado, no un dato mejor probado.
+      const campo = exp.campos.get(ruta)
+      exp.campos.set(ruta, Object.freeze({
+        ...campo,
+        valor: conflicto.propuesto,
+        cita: conflicto.citaPropuesta,
+        evidencia: 'Reportado',
+        seq: e.seq
+      }))
       break
     }
 
@@ -262,6 +317,7 @@ function congelar (exp, eventos) {
     contradicciones: Object.freeze(exp.contradicciones.map(Object.freeze)),
     // Campos donde dos fuentes se contradicen. NO se resuelven solos.
     conflictos: Object.freeze(exp.conflictos.map(Object.freeze)),
+    resoluciones: Object.freeze(exp.resoluciones.map(Object.freeze)),
     resumen: Object.freeze({
       eventos: eventos.length,
       camposAsentados: Object.keys(campos).length,
@@ -286,6 +342,7 @@ function vacio () {
     id: null, estado: null, campos: Object.freeze({}), huecos: Object.freeze({}), fuentes: Object.freeze([]),
     duplicadoDe: null, historial: Object.freeze([]), decisiones: Object.freeze([]),
     contradicciones: Object.freeze([]), conflictos: Object.freeze([]),
+    resoluciones: Object.freeze([]),
     resumen: Object.freeze({
       eventos: 0, camposAsentados: 0, camposRechazados: 0, huecosAbiertos: 0,
       conflictosAbiertos: 0, camposPropuestos: 0,
