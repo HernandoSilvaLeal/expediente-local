@@ -20,7 +20,7 @@ cae, y que responde ante un supervisor por cada expediente. Aquí eso es el
 18 y 29.
 
 **Qué lo hace distinto.** El modelo propone; **el código decide y una persona
-firma**. De dieciocho módulos, uno toca un modelo — y hay un test que falla si
+firma**. De dieciocho módulos, tres tocan un modelo — y hay un test que falla si
 el núcleo importa el SDK.
 
 > **¿Primera vez aquí y no eres técnico?** → **[EMPIEZA-AQUI.md](EMPIEZA-AQUI.md)**,
@@ -374,7 +374,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 | De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
 | Casos de uso punta a punta | **25** |
 | Casos trampa, uno por guardia | **17 / 17** — cobertura G1..G10 completa |
-| Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
+| Módulos deterministas / que tocan un modelo | **15 / 3** → **83,3 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
 | Puertas de entrega en PASS | **12 / 13** — la 13 exige que el SDK instalado sea el declarado |
 | Invariantes O1..O5 sobre datos reales | **5 / 5** |

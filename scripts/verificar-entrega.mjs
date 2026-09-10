@@ -200,7 +200,16 @@ puerta('la definición del problema sigue describiendo el sistema', () => {
       if (!existsSync(d)) continue
       for (const f of readdirSync(d)) if (f.endsWith('.mjs')) modulos.push(join(d, f))
     }
-    const conModelo = modulos.filter(m => /@qvac\/sdk/.test(readFileSync(m, 'utf8'))).length
+    // Se cuentan los IMPORTS, no las menciones: casi todos los archivos del
+    // núcleo llevan un comentario que dice «PROHIBIDO aquí: importar @qvac/sdk»,
+    // así que buscar el nombre a secas daba que el 89 % del sistema toca el
+    // modelo cuando es justo al revés. Es el mismo patrón de siempre —buscar
+    // texto donde hace falta mirar el contenido— y van seis.
+    // `from '@qvac/sdk'` y no `import ... '@qvac/sdk'`: un import de varias
+    // líneas —el de ia/extraer.mjs lo es— no cabe en una sola, y buscarlo así
+    // lo daba por ausente. Van siete del mismo patrón.
+    const IMPORTA = /from\s*['"]@qvac\/sdk['"]|import\s*\(\s*['"]@qvac\/sdk/
+    const conModelo = modulos.filter(m => IMPORTA.test(readFileSync(m, 'utf8'))).length
     const medido = modulos.length ? +(100 * (modulos.length - conModelo) / modulos.length).toFixed(1) : 0
     if (Math.abs(Number(pct) - medido) > 0.1) {
       malos.push(`dice ${pct} % determinista y la cuenta da ${medido} %`)
@@ -419,20 +428,30 @@ puerta('el smoke sale con JSON válido', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 
-const V = '\x1b[0;32m', R = '\x1b[0;31m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
+const V = '\x1b[0;32m', R = '\x1b[0;31m', A = '\x1b[0;33m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
 
 console.log(`\n  ${B}VERIFICACIÓN DE ENTREGA${N}   ${G}cada línea, algo que descalifica por sí solo${N}\n`)
 
 let fallos = 0
 for (const [i, p] of puertas.entries()) {
   let r
+  // ── EL TIEMPO DE CADA PUERTA SE VE SIEMPRE ──────────────────────────────
+  //
+  // Una puerta lenta no es un detalle: esto se corre veinte veces al día y una
+  // que tarde segundos hace que se deje de correr, que es la única forma real
+  // de que una puerta falle. Ya pasó: una llamaba a `metricas.mjs`, que corre
+  // los 370 tests por dentro, y la verificación entera pasó de un segundo a más
+  // de dos minutos. Sin este número, eso se descubre por hartazgo.
+  const t0 = Date.now()
   try { r = p.fn() } catch (e) { r = { ok: false, detalle: e.message.slice(0, 80) } }
+  const ms = Date.now() - t0
+  const tiempo = ms >= 1000 ? `${A}${(ms / 1000).toFixed(1)} s${N}` : `${G}${ms} ms${N}`
   const n = `[${String(i + 1).padStart(2)}/${puertas.length}]`
   if (r.ok) {
-    console.log(`  ${G}${n}${N} ${p.nombre.padEnd(48)} ${V}PASS${N}`)
+    console.log(`  ${G}${n}${N} ${p.nombre.padEnd(48)} ${V}PASS${N}  ${tiempo}`)
   } else {
     fallos++
-    console.log(`  ${G}${n}${N} ${p.nombre.padEnd(48)} ${R}${B}FALLA${N}`)
+    console.log(`  ${G}${n}${N} ${p.nombre.padEnd(48)} ${R}${B}FALLA${N}  ${tiempo}`)
     if (r.detalle) console.log(`         ${R}${r.detalle}${N}`)
     console.log(`         ${G}${p.porque}${N}`)
   }

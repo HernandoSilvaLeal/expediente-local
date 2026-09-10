@@ -237,8 +237,9 @@ npm run calidad             # cuánto sobrevivió, y con qué respaldo
 unshare -rn bash -c 'npm run smoke'    # el sistema entero, sin red
 ```
 
-**De 18 módulos, 1 toca un modelo.** El 94,4 % del sistema es código
-determinista, y hay un test que falla si el núcleo importa el SDK de IA.
+**De 18 módulos, 3 tocan un modelo** —el extractor y los dos de la malla— y los
+otros 15 no. El **83,3 %** del sistema es código determinista, y hay un test que
+falla si el núcleo importa el SDK de IA.
 
 ---
 

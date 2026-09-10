@@ -224,6 +224,10 @@ test('UI-10 · la tableta de la sucursal SÍ escribe, con su propio origen', asy
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('UI-11 · resolver exige valor de la disputa, oficial y motivo', async () => {
+  // Expediente propio, no EXP-003: un test que depende de los datos de ejemplo
+  // falla en cuanto alguien los toca a mano, y culpar al sistema de eso es
+  // culpar al sistema del andamio. Ya se resolvió así en UI-20 y faltaba aquí.
+  const id = await expedienteConConflicto('EXP-EXIGE')
   // Con el rol correcto: lo que se prueba aquí son las reglas del NÚCLEO, no
   // las del control dual. Cada capa se comprueba por separado o no se sabe cuál
   // rechazó.
@@ -236,24 +240,25 @@ test('UI-11 · resolver exige valor de la disputa, oficial y motivo', async () =
      /exige motivo/]
   ]
   for (const [cuerpo, esperado] of casos) {
-    const r = await post('/api/resolver/EXP-003', cuerpo)
+    const r = await post(`/api/resolver/${id}`, cuerpo)
     assert.equal(r.status, 409, 'no es un fallo del servidor: es una operación ilegal')
     assert.match((await r.json()).error, esperado)
   }
 })
 
 test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async () => {
-  const antes = await (await fetch(`${BASE}/api/expediente/EXP-003`)).json()
+  const id = await expedienteConConflicto('EXP-CICLO')
+  const antes = await (await fetch(`${BASE}/api/expediente/${id}`)).json()
   assert.equal(antes.expediente.conflictos.length, 1, 'parte de un conflicto abierto')
 
   // Con el conflicto abierto, la firma se para en seco.
-  const bloqueada = await post('/api/decidir/EXP-003',
+  const bloqueada = await post(`/api/decidir/${id}`,
     { que: 'aprobar', rol: 'aprobador', oficial: 'R. Him · gerente', motivo: 'conforme' })
   assert.equal(bloqueada.status, 409)
   assert.match((await bloqueada.json()).error, /se contradicen/)
 
   // Una persona lo zanja, con su nombre y su motivo.
-  const resuelto = await post('/api/resolver/EXP-003', {
+  const resuelto = await post(`/api/resolver/${id}`, {
     campo: 'titular.nombre',
     valor: 'María Gómez Batista',
     rol: 'oficial',
@@ -264,13 +269,13 @@ test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async ()
   assert.equal((await resuelto.json()).conflictos, 0)
 
   // Y ahora sí.
-  const firmada = await post('/api/decidir/EXP-003',
+  const firmada = await post(`/api/decidir/${id}`,
     { que: 'aprobar', rol: 'aprobador', oficial: 'R. Him · gerente de sucursal', motivo: 'Resolución revisada.' })
   assert.equal(firmada.status, 200)
   assert.equal((await firmada.json()).estado, 'APROBADO')
 
   // Y queda escrito quién, con la cadena intacta.
-  const despues = await (await fetch(`${BASE}/api/expediente/EXP-003`)).json()
+  const despues = await (await fetch(`${BASE}/api/expediente/${id}`)).json()
   assert.equal(despues.expediente.decisiones.at(-1).oficial, 'R. Him · gerente de sucursal')
   assert.ok(despues.cadena.intacta)
 })

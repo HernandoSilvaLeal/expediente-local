@@ -287,9 +287,30 @@ function medirRelacionSoftwareIa () {
   const ui     = archivosSeguros(join(RAIZ, 'ui')).length
   const ia     = archivosSeguros(join(RAIZ, 'ia')).length
   const total  = nucleo + malla + ui + ia
+
+  // ── SE CUENTA QUIÉN IMPORTA, NO EN QUÉ CARPETA ESTÁ ─────────────────────
+  //
+  // Esto contaba `conModelo: ia`, o sea: daba por hecho que solo los archivos
+  // de `ia/` tocan el modelo. Pero `malla/motor.mjs` y `malla/proveedor.mjs`
+  // también importan el SDK — el motor para inferir, el proveedor para abrir el
+  // hyperswarm.
+  //
+  // El número publicado era 94,4 % determinista. El real es 83,3 %. No es una
+  // diferencia cosmética: era una afirmación pública que medía la estructura de
+  // carpetas y no lo que decía medir.
+  //
+  // La regla del proyecto es que cuando la afirmación y el comando divergen,
+  // gana el comando. Aquí el comando también estaba mal, así que se arregla el
+  // comando primero y el número después.
+  const IMPORTA_SDK = /from\s*['"]@qvac\/sdk['"]|import\s*\(\s*['"]@qvac\/sdk/
+  const tocanModelo = [...archivosSeguros(join(RAIZ, 'core')),
+                       ...archivosSeguros(join(RAIZ, 'ia')),
+                       ...archivosSeguros(join(RAIZ, 'malla')),
+                       ...archivosSeguros(join(RAIZ, 'ui'))]
+    .filter(f => IMPORTA_SDK.test(readFileSync(f, 'utf8'))).length
   return {
-    total, conModelo: ia, sinModelo: total - ia,
-    porcentajeDeterminista: total ? +((total - ia) / total * 100).toFixed(1) : 0,
+    total, conModelo: tocanModelo, sinModelo: total - tocanModelo,
+    porcentajeDeterminista: total ? +((total - tocanModelo) / total * 100).toFixed(1) : 0,
     // Mientras ia/ esté vacío el porcentaje sale 100 y no significa nada: el
     // sistema todavía no infiere. Decirlo en voz alta antes de que lo diga el
     // jurado es la diferencia entre un indicador y una mentira con decimales.
