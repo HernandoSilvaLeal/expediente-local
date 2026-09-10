@@ -180,6 +180,20 @@ puerta('la frontera 95/5 aguanta', () => {
   } catch { return { ok: false, detalle: 'core/ importa el SDK' } }
 }, 'es la afirmación central del proyecto: si no se sostiene, no se dice')
 
+puerta('el banco de casos trampa se comporta como se declaró', () => {
+  // Los tests prueban el código; esto prueba que el sistema hace lo que el
+  // archivo de casos DICE que va a hacer. Un auditor puede leer ese .json sin
+  // saber JavaScript y comprobarlo con un comando.
+  try {
+    const salida = execFileSync(process.execPath, ['scripts/casos.mjs'],
+      { cwd: RAIZ, encoding: 'utf8', timeout: 180_000 })
+    const m = /(\d+)\/(\d+) casos se comportan/.exec(salida.replace(/\x1b\[[0-9;]*m/g, ''))
+    const sinCubrir = /sin caso que las ejercite:\s*([^\n]*)/.exec(salida.replace(/\x1b\[[0-9;]*m/g, ''))
+    if (sinCubrir) return { ok: false, detalle: `guardias sin caso: ${sinCubrir[1].trim()}` }
+    return { ok: Boolean(m) && m[1] === m[2], detalle: m ? `${m[1]}/${m[2]}` : 'no se pudo leer el resultado' }
+  } catch (e) { return { ok: false, detalle: (e.stdout ?? e.message).slice(-160) } }
+}, 'una guardia sin un caso que la ejercite es una guardia que nadie ha visto trabajar')
+
 puerta('el smoke sale con JSON válido', () => {
   try {
     const salida = execFileSync(process.execPath, ['scripts/smoke.mjs'],

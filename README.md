@@ -77,7 +77,9 @@ cd expediente-local && npm ci
 | Que el núcleo funciona | `npm test` | **307 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
-| Que nada descalifica | `npm run verify:entrega` | **11 puertas**, cada una eliminatoria |
+| Que nada descalifica | `npm run verify:entrega` | **12 puertas**, cada una eliminatoria |
+| Que **cada guardia** hace su trabajo | `npm run casos` | **13 casos trampa**, cobertura G1..G8 |
+| Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
 | **La interfaz** | `npm start` → http://127.0.0.1:7301 | cero dependencias, cero build |
 
@@ -237,9 +239,10 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 | Tests | **307 / 307** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **~62 %** |
 | Casos de uso punta a punta | **18** |
+| Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G8 |
 | Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
-| Puertas de entrega en PASS | **11 / 11** |
+| Puertas de entrega en PASS | **12 / 12** |
 | Invariantes O1..O5 sobre datos reales | **5 / 5** |
 
 ### ⚫ Lo que NO está medido
