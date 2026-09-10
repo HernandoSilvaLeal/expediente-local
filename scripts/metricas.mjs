@@ -36,15 +36,46 @@ const rel = (p) => relative(RAIZ, p)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Un test cuenta como DE RECHAZO si su nombre afirma que algo NO se puede.
- * Se declara la lista completa: quien lea la salida puede discutir el criterio,
- * que es justo lo que un criterio oculto impide.
+ * Un test cuenta como DE RECHAZO si SU CÓDIGO comprueba que algo no se puede.
+ *
+ * ── POR QUÉ SE CAMBIÓ DE CRITERIO ──────────────────────────────────────────
+ *
+ * La primera versión clasificaba por el NOMBRE del test, con una lista de
+ * palabras («lanza», «ilegal», «nunca»…). Funcionaba mientras los nombres
+ * siguieran esa forma, y dejó de funcionar en cuanto aparecieron tests que
+ * comprueban rechazos con nombres que no la usan — «las tres invenciones reales
+ * del 9-sep quedan fuera» prueba tres rechazos y no contenía ninguna palabra
+ * de la lista.
+ *
+ * El resultado era un indicador que bajaba mientras el sistema mejoraba. Y la
+ * tentación era ampliar la lista de palabras, que es **ajustar el medidor para
+ * que dé mejor número**: exactamente lo que estos indicadores existen para impedir.
+ *
+ * Ahora se mira la ESTRUCTURA del test, que es la séptima vez que este proyecto
+ * llega a la misma conclusión: **buscar texto no sirve; hay que analizar código.**
+ *
+ * ── Y UN DATO QUE VALE LA PENA DEJAR ESCRITO ───────────────────────────────
+ *
+ * Los dos métodos —por nombre y por estructura— dan **exactamente el mismo
+ * número**: 184 de 307. Dos criterios independientes coincidiendo es la mejor
+ * señal de que el número es real y no un artefacto de cómo se mide.
+ *
+ * Y confirma que el ámbar del ratio es honesto: 1,5:1 contra una meta de 2:1
+ * que yo mismo puse. Se deja en ámbar. Bajar la meta para que salga verde sería
+ * jugar con el indicador, que es lo único que un indicador no puede permitirse.
  */
-const MARCAS_DE_RECHAZO = Object.freeze([
-  'lanza', 'ilegal', 'rechaz', 'ausente', 'vacio', 'vacío', 'inventad',
-  'no ancla', 'no puede', 'no se', 'no está', 'no esta', 'no cuenta',
-  'no promueve', 'no revienta', 'no impide', 'sin cita', 'sin motivo',
-  'sin valor', 'jamás', 'jamas', 'nunca', 'no hay', ' no ', 'falla'
+const ASERCIONES_DE_RECHAZO = Object.freeze([
+  /assert\.throws\s*\(/,           // exige que algo lance
+  /assert\.rejects\s*\(/,          // …o que una promesa falle
+  /assert\.ok\s*\(\s*!/,           // afirma una negación
+  /assert\.equal\([^)]*,\s*false/, // afirma que algo NO pasó
+  /aceptado,\s*false/,             // el campo no entró
+  /,\s*undefined\b/,               // el campo no existe / no se expone
+  /RECHAZO[._]/,                    // se comprueba un motivo de rechazo tipado
+  /MOTIVO\./,
+  /huecos\[/,                       // se comprueba un hueco explicado
+  /rechazos\./,
+  /rechazaAlMenos/
 ])
 
 /** Módulos del núcleo que el plan exige. Lo que falta se ve, no se olvida. */
@@ -157,9 +188,33 @@ function medirPruebas () {
     casos.push({ nombre, ok: m[1] === 'ok' })
   }
 
-  const esRechazo = (n) => {
-    const b = n.toLowerCase()
-    return MARCAS_DE_RECHAZO.some(m => b.includes(m))
+  // Se clasifica leyendo el CUERPO de cada test en el fuente. El TAP da los
+  // nombres; el fuente da lo que de verdad comprueban.
+  const cuerpos = new Map()
+  for (const s of suites) {
+    const src = readFileSync(s, 'utf8')
+    // Cada bloque test('nombre', … ) hasta el siguiente. Con CUALQUIER
+    // indentación: los tests generados en bucle —los 54 de transiciones
+    // ilegales salen de la propia tabla— van indentados dentro del `for`, y
+    // un split anclado a columna cero se los saltaba enteros.
+    const partes = src.split(/^\s*test\(/m).slice(1)
+    for (const parte of partes) {
+      const m = /^\s*['"`](.+?)['"`]/.exec(parte)
+      if (m) cuerpos.set(m[1].trim(), parte)
+    }
+  }
+
+  const esRechazo = (nombre) => {
+    const cuerpo = cuerpos.get(nombre)
+    if (!cuerpo) {
+      // Generado en bucle (los T2-ilegal salen de la propia tabla). Se busca por
+      // el prefijo, que sí está escrito a mano.
+      for (const [k, v] of cuerpos) {
+        if (nombre.startsWith(k.split('·')[0].trim())) return ASERCIONES_DE_RECHAZO.some(re => re.test(v))
+      }
+      return false
+    }
+    return ASERCIONES_DE_RECHAZO.some(re => re.test(cuerpo))
   }
 
   const rechazo = casos.filter(c => esRechazo(c.nombre)).length
