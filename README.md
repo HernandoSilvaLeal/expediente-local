@@ -374,10 +374,21 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 | De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
 | Casos de uso punta a punta | **25** |
 | Casos trampa, uno por guardia | **17 / 17** — cobertura G1..G10 completa |
-| Módulos deterministas / que tocan un modelo | **15 / 3** → **83,3 %** |
+| Módulos que **importan** el SDK / total | **3 / 18** → **83,3 %** no lo importa |
+| De esos 3, los que **ejecutan inferencia** | **2** → **88,9 %** del sistema no toca un modelo |
+| De esos 2, los que **pueden meter un dato** en el expediente | **1** → **94,4 %** no puede meter un dato |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
-| Puertas de entrega en PASS | **12 / 13** — la 13 exige que el SDK instalado sea el declarado |
+| Puertas de entrega en PASS | **15 / 16** — la del SDK exige que el instalado sea el declarado |
 | Invariantes O1..O5 sobre datos reales | **5 / 5** |
+
+> **Por qué tres filas y no una.** Importar el SDK, inferir y decidir qué entra
+> al expediente son cosas distintas: `malla/proveedor.mjs` importa el SDK para
+> abrir el **transporte entre aparatos**, no para inferir, y `malla/motor.mjs`
+> infiere para **otro** dispositivo. **El número que decimos en voz alta es el
+> primero**, el 83,3 %, porque es el más exigente contra nosotros. Publicar solo
+> el 94,4 % sería exagerar a nuestro favor — y es justo lo que este proyecto
+> hizo durante días, porque el contador asumía la respuesta por la carpeta.
+> Detalle en [docs/PROBLEMA.md](docs/PROBLEMA.md).
 
 ### La calidad del dataset, medida
 

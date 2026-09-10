@@ -1,14 +1,14 @@
 {
   "_": "Salida de `npm run metricas`, que ejecuta la suite de verdad y cuenta desde el código.",
-  "fecha": "2026-09-10T21:25:41.770Z",
+  "fecha": "2026-09-10T22:03:48.157Z",
   "tests": {
-    "total": 370,
-    "pasan": 370,
+    "total": 382,
+    "pasan": 382,
     "fallan": 0
   },
   "de_rechazo": {
-    "cantidad": 196,
-    "porcentaje": 53,
+    "cantidad": 201,
+    "porcentaje": 52.6,
     "_nota": "Tests que prueban que algo NO se puede. Probar el camino feliz no demuestra nada."
   },
   "fsm": {
@@ -25,6 +25,24 @@
     "total": 18,
     "conModelo": 3,
     "sinModelo": 15,
+    "importanSdk": 3,
+    "ejecutanInferencia": 2,
+    "decidenQueEntra": 1,
+    "quienImportaSdk": [
+      "ia/extraer.mjs",
+      "malla/motor.mjs",
+      "malla/proveedor.mjs"
+    ],
+    "quienInfiere": [
+      "ia/extraer.mjs",
+      "malla/motor.mjs"
+    ],
+    "quienDecide": [
+      "ia/extraer.mjs"
+    ],
+    "porcentajeSinSdk": 83.3,
+    "porcentajeSinInferencia": 88.9,
+    "porcentajeNoDeciden": 94.4,
     "porcentajeDeterminista": 83.3,
     "concluyente": true,
     "verificada_por": "npm run test:frontera"

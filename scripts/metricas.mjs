@@ -24,6 +24,7 @@
 // Sin dependencias. Corre sin modelo, sin red y sin el SDK.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
+import { contarFrontera } from './frontera.mjs'
 import { join, relative, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
@@ -282,11 +283,7 @@ function medirFrontera () {
 
 /** Cuántas cajas del sistema tocan un modelo. Es EL número del pitch. */
 function medirRelacionSoftwareIa () {
-  const nucleo = archivosSeguros(join(RAIZ, 'core')).length
-  const malla  = archivosSeguros(join(RAIZ, 'malla')).filter(a => !a.includes('node_modules')).length
-  const ui     = archivosSeguros(join(RAIZ, 'ui')).length
-  const ia     = archivosSeguros(join(RAIZ, 'ia')).length
-  const total  = nucleo + malla + ui + ia
+  const ia = archivosSeguros(join(RAIZ, 'ia')).length
 
   // ── SE CUENTA QUIÉN IMPORTA, NO EN QUÉ CARPETA ESTÁ ─────────────────────
   //
@@ -299,18 +296,36 @@ function medirRelacionSoftwareIa () {
   // diferencia cosmética: era una afirmación pública que medía la estructura de
   // carpetas y no lo que decía medir.
   //
-  // La regla del proyecto es que cuando la afirmación y el comando divergen,
-  // gana el comando. Aquí el comando también estaba mal, así que se arregla el
-  // comando primero y el número después.
-  const IMPORTA_SDK = /from\s*['"]@qvac\/sdk['"]|import\s*\(\s*['"]@qvac\/sdk/
-  const tocanModelo = [...archivosSeguros(join(RAIZ, 'core')),
-                       ...archivosSeguros(join(RAIZ, 'ia')),
-                       ...archivosSeguros(join(RAIZ, 'malla')),
-                       ...archivosSeguros(join(RAIZ, 'ui'))]
-    .filter(f => IMPORTA_SDK.test(readFileSync(f, 'utf8'))).length
+  // ── Y UN SOLO NÚMERO SIGUE SIN PODER DECIRLO ─────────────────────────────
+  //
+  // Importar el SDK, ejecutar inferencia y decidir qué entra al expediente son
+  // TRES cosas distintas: `malla/proveedor.mjs` importa el SDK para abrir el
+  // transporte entre aparatos y no infiere nada. La cuenta vive en un solo
+  // sitio —`scripts/frontera.mjs`— porque la puerta de entrega necesita la
+  // misma y NO puede llamar aquí: este script corre los 370 tests por dentro.
+  // Con la cuenta duplicada, la puerta habría comprobado el documento contra su
+  // propia copia de la regla, que es el verificador siendo parte de lo
+  // verificado.
+  const f = contarFrontera(RAIZ)
+  const total = f.total
+  const tocanModelo = f.importanSdk.length
+
   return {
-    total, conModelo: tocanModelo, sinModelo: total - tocanModelo,
-    porcentajeDeterminista: total ? +((total - tocanModelo) / total * 100).toFixed(1) : 0,
+    total,
+    // `conModelo` sigue siendo el corte del SDK: es el más exigente contra
+    // nosotros y es el que se dice en cámara. Los otros dos van al lado, no en
+    // su lugar.
+    conModelo: tocanModelo, sinModelo: total - tocanModelo,
+    importanSdk: f.importanSdk.length,
+    ejecutanInferencia: f.ejecutanInferencia.length,
+    decidenQueEntra: f.decidenQueEntra.length,
+    quienImportaSdk: f.importanSdk,
+    quienInfiere: f.ejecutanInferencia,
+    quienDecide: f.decidenQueEntra,
+    porcentajeSinSdk: f.porcentajeSinSdk,
+    porcentajeSinInferencia: f.porcentajeSinInferencia,
+    porcentajeNoDeciden: f.porcentajeNoDeciden,
+    porcentajeDeterminista: f.porcentajeSinSdk,
     // Mientras ia/ esté vacío el porcentaje sale 100 y no significa nada: el
     // sistema todavía no infiere. Decirlo en voz alta antes de que lo diga el
     // jurado es la diferencia entre un indicador y una mentira con decimales.
@@ -592,9 +607,15 @@ async function main () {
   }
 
   // ── La proporción que es el pitch ─────────────────────────────────────────
-  console.log(`\n  ${B}LA FRONTERA 95/5${N}   ${G}el número que se dice en cámara${N}`)
-  console.log(`     ${proporcion.sinModelo} módulos deterministas · ${proporcion.conModelo} tocan un modelo` +
-              `  →  ${C}${proporcion.porcentajeDeterminista} %${N} del sistema no consulta a nadie`)
+  console.log(`\n  ${B}LA FRONTERA 95/5${N}   ${G}tres cortes, porque son tres cosas distintas${N}`)
+  console.log(`     de ${proporcion.total} módulos…`)
+  console.log(`     ${C}${String(proporcion.importanSdk).padStart(2)}${N} importan el SDK        ` +
+              `→ ${C}${proporcion.porcentajeSinSdk} %${N} no lo importa   ${G}(3.º incluye el transporte P2P)${N}`)
+  console.log(`     ${C}${String(proporcion.ejecutanInferencia).padStart(2)}${N} ejecutan inferencia    ` +
+              `→ ${C}${proporcion.porcentajeSinInferencia} %${N} no infiere      ${G}(uno sirve a OTRO aparato)${N}`)
+  console.log(`     ${C}${String(proporcion.decidenQueEntra).padStart(2)}${N} deciden qué entra      ` +
+              `→ ${C}${proporcion.porcentajeNoDeciden} %${N} no decide      ${G}${B}← el que sostiene la doctrina${N}`)
+  console.log(`     ${G}el que se dice en cámara es el primero: es el más exigente contra nosotros${N}`)
   console.log(`     ${frontera.intacta ? V + '✓ verificado por comando' : R + '✗ FRONTERA ROTA'}${N}` +
               `   ${G}npm run test:frontera${N}`)
   if (!proporcion.concluyente) {

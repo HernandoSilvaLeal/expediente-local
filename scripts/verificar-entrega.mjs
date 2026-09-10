@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { LISTA_NEGRA, AUTOEXCLUIDOS } from './lista-negra.mjs'
+import { contarFrontera } from './frontera.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const rel = (p) => relative(RAIZ, p)
@@ -185,36 +186,57 @@ puerta('la definición del problema sigue describiendo el sistema', () => {
     }
   } catch { malos.push('no se pudo leer el banco de casos') }
 
-  // Y la proporción determinista, que también se afirma con número.
+  // ── LOS TRES CORTES, NO UNO ──────────────────────────────────────────────
   //
-  // Se cuenta AQUÍ y no se le pregunta a `metricas.mjs`: ese script corre los
-  // 370 tests por dentro para sacar sus números, así que llamarlo desde una
-  // puerta multiplicaba por cien lo que tarda la verificación entera —de un
-  // segundo a más de dos minutos—. Una puerta que se corre veinte veces al día
-  // no puede pagar el coste de una suite completa para leer un porcentaje.
-  const pct = /(\d+[,.]\d+)\s*%\s*del sistema es c[oó]digo/i.exec(texto)?.[1]?.replace(',', '.')
-  if (pct) {
-    const modulos = []
-    for (const dir of ['core', 'ia', 'malla', 'ui']) {
-      const d = join(RAIZ, dir)
-      if (!existsSync(d)) continue
-      for (const f of readdirSync(d)) if (f.endsWith('.mjs')) modulos.push(join(d, f))
-    }
-    // Se cuentan los IMPORTS, no las menciones: casi todos los archivos del
-    // núcleo llevan un comentario que dice «PROHIBIDO aquí: importar @qvac/sdk»,
-    // así que buscar el nombre a secas daba que el 89 % del sistema toca el
-    // modelo cuando es justo al revés. Es el mismo patrón de siempre —buscar
-    // texto donde hace falta mirar el contenido— y van seis.
-    // `from '@qvac/sdk'` y no `import ... '@qvac/sdk'`: un import de varias
-    // líneas —el de ia/extraer.mjs lo es— no cabe en una sola, y buscarlo así
-    // lo daba por ausente. Van siete del mismo patrón.
-    const IMPORTA = /from\s*['"]@qvac\/sdk['"]|import\s*\(\s*['"]@qvac\/sdk/
-    const conModelo = modulos.filter(m => IMPORTA.test(readFileSync(m, 'utf8'))).length
-    const medido = modulos.length ? +(100 * (modulos.length - conModelo) / modulos.length).toFixed(1) : 0
-    if (Math.abs(Number(pct) - medido) > 0.1) {
-      malos.push(`dice ${pct} % determinista y la cuenta da ${medido} %`)
+  // El documento ya no publica «el 83,3 % es determinista» a secas, porque eso
+  // fundía tres afirmaciones distintas en una: cuántos módulos IMPORTAN el SDK,
+  // cuántos INFIEREN de verdad, y cuántos pueden meter un dato en el
+  // expediente. La puerta comprueba las tres; si el documento afirma una y la
+  // cuenta da otra, no se entrega.
+  //
+  // La cuenta NO se hace aquí: vive en `scripts/frontera.mjs`, importada por
+  // esta puerta y por `metricas.mjs`. Duplicarla habría sido cómodo —esta
+  // puerta no puede llamar a metricas.mjs, que corre los 370 tests por dentro y
+  // pasaría la verificación de un segundo a más de dos minutos— pero entonces
+  // la puerta estaría comprobando el documento contra su PROPIA copia de la
+  // regla, y las dos copias se irían separando sin que nadie lo note. Es el
+  // patrón de la constante repetida y el del verificador que forma parte de lo
+  // verificado, los dos a la vez.
+  const f = contarFrontera(RAIZ)
+
+  // Cada afirmación con la frase exacta con la que se escribe en el documento.
+  // Se busca la frase y no el número suelto: un `83,3 %` cualquiera en otra
+  // tabla no debe hacer pasar —ni fallar— esta puerta.
+  //
+  // Se busca sobre el texto SIN marcado. La primera versión buscaba sobre el
+  // documento crudo y no encontró ninguna de las tres, porque en Markdown el
+  // número va en negrita —`**83,3 %** del sistema…`— y los asteriscos se meten
+  // entre el número y la frase. La puerta se puso en rojo diciendo «ya no se
+  // publica ninguna proporción» cuando estaban las tres.
+  //
+  // Es el mismo patrón de siempre: comparar texto sin quitarle antes lo que no
+  // es texto. Aquí salió gratis porque falló hacia el lado seguro; en
+  // `citaEstaEnFuente` falló hacia el lado que deja pasar un dato inventado.
+  const plano = texto.replace(/[*_`]/g, '')
+  const AFIRMACIONES = [
+    [/(\d+[,.]\d+)\s*%\s*del sistema es c[oó]digo/i, f.porcentajeSinSdk,        'importan el SDK'],
+    [/(\d+[,.]\d+)\s*%\s*no toca un modelo/i,        f.porcentajeSinInferencia, 'ejecutan inferencia'],
+    [/(\d+[,.]\d+)\s*%\s*no puede meter un dato/i,   f.porcentajeNoDeciden,     'deciden qué entra']
+  ]
+  let afirmadas = 0
+  for (const [patron, medido, corte] of AFIRMACIONES) {
+    const dice = patron.exec(plano)?.[1]?.replace(',', '.')
+    if (dice === undefined) continue
+    afirmadas++
+    if (Math.abs(Number(dice) - medido) > 0.1) {
+      malos.push(`«${corte}»: dice ${dice} % y la cuenta da ${medido} %`)
     }
   }
+  // Que las tres desaparezcan del documento también es un fallo: sería quitar
+  // la afirmación en vez de corregirla, y esta puerta dejaría de vigilar nada
+  // sin ponerse en rojo ni una vez. Detectar y no actuar es el patrón que más
+  // veces nos ha pasado.
+  if (afirmadas === 0) malos.push('el documento ya no publica ninguna proporción del sistema')
 
   return { ok: malos.length === 0, detalle: malos.join(' · ') }
 }, 'un documento que explica el problema con números viejos es marketing con aspecto de análisis')

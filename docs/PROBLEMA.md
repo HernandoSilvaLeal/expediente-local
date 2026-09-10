@@ -237,9 +237,32 @@ npm run calidad             # cuánto sobrevivió, y con qué respaldo
 unshare -rn bash -c 'npm run smoke'    # el sistema entero, sin red
 ```
 
-**De 18 módulos, 3 tocan un modelo** —el extractor y los dos de la malla— y los
-otros 15 no. El **83,3 %** del sistema es código determinista, y hay un test que
-falla si el núcleo importa el SDK de IA.
+### La proporción, en tres cortes — porque son tres cosas distintas
+
+Decir «el 83,3 % es determinista» es cómodo y no dice cuál de tres cosas se está
+midiendo. **Importar el SDK, ejecutar inferencia y decidir qué entra al
+expediente no son lo mismo**, así que se publican los tres, de 18 módulos:
+
+| Corte | Cuántos | El resto | Qué mide exactamente |
+|---|---|---|---|
+| **importan el SDK** | 3 | **83,3 %** del sistema es código determinista | uno de los tres —`malla/proveedor.mjs`— lo usa como **transporte entre aparatos**, no para inferir |
+| **ejecutan inferencia** | 2 | **88,9 %** no toca un modelo | `ia/extraer.mjs` y `malla/motor.mjs` |
+| **deciden qué entra al expediente** | **1** | **94,4 %** no puede meter un dato | `malla/motor.mjs` infiere para **otro** dispositivo; su salida no entra aquí |
+
+**El que se dice en cámara es el primero**, el 83,3 %, porque es el más exigente
+contra nosotros: cuenta como «toca IA» hasta un módulo que solo abre un socket.
+
+> Publicar solo el 94,4 % sería exagerar hacia arriba; publicar solo el 83,3 %
+> como si fuera la frontera del dato sería confundir dos afirmaciones. **La
+> tentación de fundirlas en una es exactamente el fallo que este proyecto existe
+> para atacar** — y ya nos costó una cifra falsa: `metricas.mjs` publicó 94,4 %
+> durante días porque asumía la respuesta **por la carpeta** en la que estaba
+> cada archivo, en vez de mirar lo que el archivo importa.
+
+```bash
+npm run metricas         # los tres cortes, contados sobre el código
+npm run test:frontera    # falla si el núcleo importa el SDK
+```
 
 ---
 
