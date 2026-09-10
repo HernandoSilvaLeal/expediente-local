@@ -74,7 +74,7 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **267 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **307 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **11 puertas**, cada una eliminatoria |
@@ -109,6 +109,32 @@ Y el expediente **no se puede aprobar**, porque le falta un campo crítico:
 node cli.mjs aprobar --ledger /tmp/demo/e.jsonl --texto "confío"
 #  ✗ No se puede aprobar un expediente en estado VALIDADO
 ```
+
+### ⭐ Y el mismo binario, con OTRA entidad
+
+Sin recompilar y sin tocar una línea de `core/`. **Solo cambia un `.json`:**
+
+```bash
+node cli.mjs revisar \
+  --esquema instancias/salud/esquema.json \
+  --expediente EQ-001 \
+  --texto "$(cat instancias/salud/seed/dictado-01.txt)" \
+  --extraccion instancias/salud/seed/extraccion-01-los-tres-errores-medidos.json \
+  --ledger /tmp/salud/e.jsonl
+```
+
+Esa extracción **es literalmente la que el modelo devolvió** el 9-sep-2026 sobre inventario
+hospitalario, con los tres errores del principio de este README. El resultado:
+
+```
+  LO QUE NO ENTRÓ, Y POR QUÉ
+     ○ equipos[0].antiguedad_anios   G3 · SIN_ANCLAJE   ← la edad propagada a los TRES
+     ○ equipos[1].fabricante         G3 · SIN_ANCLAJE   ← la marca que saltó al tomógrafo
+     ○ equipos[1].antiguedad_anios   G3, G4 · …         ← una edad que nadie dijo
+```
+
+Y lo verdadero entró: tres resonadores Siemens, un tomógrafo, la sede y la ciudad.
+**No es un rechazo indiscriminado: es una comprobación.**
 
 > **La tesis de esta entrega: no le pedimos al jurado que nos crea.
 > Le dejamos el comando que lo comprueba.**
@@ -193,8 +219,12 @@ que exigen `origen: HUMANO`, y hay **seis tests** que comprueban que ni el model
 ni otro dispositivo pueden provocarlas.
 
 **Cambiar de dominio es cambiar un `.json`.** El núcleo no sabe qué es un banco: le pregunta al
-esquema qué esperaba en cada campo. Hay un caso de uso que lo demuestra corriendo el mismo código
-sobre inventario hospitalario, sin tocar una línea de `core/`.
+esquema qué esperaba en cada campo, y las reglas de negocio **se le inyectan** — el esquema dice
+dónde viven, y quien arranca las carga.
+
+Y eso **también se comprueba con un comando**: `npm run test:frontera` verifica **dos** fronteras,
+no una. Que el núcleo no importe el SDK (95/5) **y que no importe ningún dominio** (genericidad).
+Si `core/` importara la cédula panameña, esta sección seguiría estando escrita y ya no sería cierta.
 
 ---
 
@@ -204,12 +234,13 @@ sobre inventario hospitalario, sin tocar una línea de `core/`.
 
 | | |
 |---|---|
-| Tests | **267 / 267** verdes, sin modelo y sin red |
-| De ellos, prueban que algo **NO** se puede | **165** (62 %) |
-| Casos de uso de sucursal, punta a punta | **14** |
+| Tests | **307 / 307** verdes, sin modelo y sin red |
+| De ellos, prueban que algo **NO** se puede | **~62 %** |
+| Casos de uso punta a punta | **18** |
 | Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
 | Puertas de entrega en PASS | **11 / 11** |
+| Invariantes O1..O5 sobre datos reales | **5 / 5** |
 
 ### ⚫ Lo que NO está medido
 

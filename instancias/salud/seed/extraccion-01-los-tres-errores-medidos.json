@@ -1,0 +1,20 @@
+{
+  "sede": {
+    "nombre": { "valor": "Hospital DemoCare Pacific", "cita": "Estoy en Hospital DemoCare Pacific" },
+    "ciudad": { "valor": "Panamá", "cita": "en Panamá" }
+  },
+  "equipos": [
+    {
+      "modalidad": "RESONADOR",
+      "cantidad":         { "valor": 3, "cita": "tres resonadores magnéticos Siemens" },
+      "fabricante":       { "valor": "Siemens", "cita": "tres resonadores magnéticos Siemens" },
+      "antiguedad_anios": { "valor": 8, "cita": "los tres resonadores tienen ocho años" }
+    },
+    {
+      "modalidad": "TOMOGRAFO",
+      "cantidad":         { "valor": 1, "cita": "y un tomógrafo" },
+      "fabricante":       { "valor": "Siemens", "cita": "y un tomógrafo" },
+      "antiguedad_anios": { "valor": 8, "cita": "y un tomógrafo" }
+    }
+  ]
+}

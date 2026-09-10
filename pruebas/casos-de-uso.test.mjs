@@ -511,3 +511,77 @@ test('CU-17 · ⭐ el NÚCLEO no sabe qué es un banco, y hay que poder demostra
       'sin las guardias de banca, el núcleo acepta: no sabe que la provincia 0 no existe')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+// ═════════════════════════════════════════════════════════════════════
+//  CASO 18 · ⭐⭐ EL MISMO BINARIO, OTRA ENTIDAD, LOS TRES ERRORES REALES
+// ═════════════════════════════════════════════════════════════════════
+
+test('CU-18 · MEDIDO · el core genérico atrapa los tres errores del 9-sep en OTRO dominio', () => {
+  // Este es el caso que junta las dos afirmaciones más fuertes del proyecto:
+  //
+  //   1. el mismo código, sin recompilar, sirve para otra entidad — solo cambia
+  //      un .json, y no se toca una línea de core/
+  //   2. los tres errores que MedPsy 1.7B produjo de verdad en esta máquina
+  //      quedan fuera, y lo verdadero entra
+  //
+  // La extracción de este test es LITERALMENTE la que el modelo devolvió, con
+  // JSON perfectamente válido y tres campos factualmente falsos.
+  const SALUD = cargarEsquema('instancias/salud/esquema.json')
+  const FUENTE = 'Estoy en Hospital DemoCare Pacific, en Panamá. Tienen tres resonadores ' +
+                 'magnéticos Siemens y un tomógrafo. Uno de los resonadores parece de unos ocho años.'
+
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-salud-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: SALUD, id: 'EQ-001',
+      ahora: () => `2026-09-10T18:${String(n++).padStart(2, '0')}:00.000Z`
+      // ← sin guardiasDominio: un hospital no tiene cédulas panameñas que validar,
+      //   y un esquema sin reglas de dominio es legítimo, no incompleto
+    })
+
+    exp.capturar(FUENTE)
+    const { revision } = exp.asentar({
+      sede: {
+        nombre: { valor: 'Hospital DemoCare Pacific', cita: 'Estoy en Hospital DemoCare Pacific' },
+        ciudad: { valor: 'Panamá', cita: 'en Panamá' }
+      },
+      equipos: [
+        { modalidad: 'RESONADOR',
+          cantidad:         { valor: 3, cita: 'tres resonadores magnéticos Siemens' },
+          fabricante:       { valor: 'Siemens', cita: 'tres resonadores magnéticos Siemens' },
+          // ERROR 1 · la edad de UNO propagada a los TRES
+          antiguedad_anios: { valor: 8, cita: 'los tres resonadores tienen ocho años' } },
+        { modalidad: 'TOMOGRAFO',
+          cantidad:         { valor: 1, cita: 'y un tomógrafo' },
+          // ERROR 2 · la marca que saltó al tomógrafo
+          fabricante:       { valor: 'Siemens', cita: 'y un tomógrafo' },
+          // ERROR 3 · una edad que nadie dijo del tomógrafo
+          antiguedad_anios: { valor: 8, cita: 'y un tomógrafo' } }
+      ]
+    })
+
+    const e = exp.leer()
+    const campo = (r) => e.campos[r]
+    const hueco = (r) => e.huecos[r]
+
+    // LOS TRES ERRORES, FUERA
+    assert.ok(hueco('equipos[0].antiguedad_anios'), 'la edad propagada a los tres tenía que caer')
+    assert.ok(hueco('equipos[1].fabricante'), 'la marca que saltó al tomógrafo tenía que caer')
+    assert.ok(hueco('equipos[1].antiguedad_anios'), 'la edad inventada del tomógrafo tenía que caer')
+
+    // Y LO VERDADERO, DENTRO — no es un rechazo indiscriminado
+    assert.equal(campo('sede.nombre').valor, 'Hospital DemoCare Pacific')
+    assert.equal(campo('equipos[0].cantidad').valor, 3)
+    assert.equal(campo('equipos[0].fabricante').valor, 'Siemens', 'los resonadores SÍ son Siemens')
+    assert.equal(campo('equipos[1].cantidad').valor, 1)
+
+    // El expediente cierra: los críticos —sede, modalidad y cantidad— están todos
+    assert.equal(e.estado, 'COMPLETO')
+
+    // Y esto es lo que hace la afirmación comprobable: NO se tocó core/.
+    // El único cambio respecto al caso bancario es el .json del esquema.
+    assert.equal(SALUD.dominio, 'salud')
+    assert.equal(SALUD.guardiasDominio, null, 'y sin reglas de dominio, que también es legítimo')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})

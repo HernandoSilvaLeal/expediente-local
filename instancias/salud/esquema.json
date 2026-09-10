@@ -1,0 +1,114 @@
+{
+  "$comentario": [
+    "ESQUEMA DE ENTIDAD — inventario de equipos médicos de un hospital.",
+    "",
+    "ESTE ARCHIVO EXISTE PARA DEMOSTRAR UNA AFIRMACIÓN, y la afirmación es fuerte:",
+    "el mismo binario, sin recompilar y sin tocar una línea de core/, extrae y valida",
+    "una entidad completamente distinta. Solo cambia este .json.",
+    "",
+    "No es un segundo producto. Es el ARNÉS que prueba que el núcleo es genérico —y",
+    "que esa palabra, en este proyecto, significa algo comprobable en vez de un adjetivo",
+    "de presentación.",
+    "",
+    "Fíjate en lo que NO cambia: la regla de oro del anclaje, la máquina de estados,",
+    "las cinco guardias de núcleo, el ledger, la proyección, los invariantes. Y en lo",
+    "que sí: la entidad, sus campos, su clave natural y sus reglas de negocio.",
+    "",
+    "Y fíjate en lo que aquí NO hay: 'guardias_dominio'. Un hospital no tiene cédulas",
+    "panameñas que validar. Un esquema sin reglas de dominio es legítimo, no incompleto."
+  ],
+
+  "dominio": "salud",
+  "version": "1.0.0",
+  "entidad": "equipo médico",
+  "descripcion": "Ficha de un equipo médico capturada de la conversación de los técnicos",
+
+  "json_schema": {
+    "name": "inventario",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sede", "equipos"],
+      "properties": {
+        "sede": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nombre"],
+          "properties": {
+            "nombre": { "$ref": "#/$defs/campoTexto" },
+            "ciudad": { "$ref": "#/$defs/campoTexto" }
+          }
+        },
+        "equipos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["modalidad", "cantidad"],
+            "properties": {
+              "modalidad": {
+                "type": "string",
+                "enum": ["RESONADOR", "TOMOGRAFO", "RAYOS_X", "ECOGRAFO", "OTRO", "DESCONOCIDO"]
+              },
+              "cantidad":         { "$ref": "#/$defs/campoNumero" },
+              "fabricante":       { "$ref": "#/$defs/campoTexto" },
+              "antiguedad_anios": { "$ref": "#/$defs/campoNumero" }
+            }
+          }
+        }
+      },
+      "$defs": {
+        "campoTexto": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["valor", "cita"],
+          "properties": {
+            "valor": { "type": "string" },
+            "cita":  {
+              "type": "string",
+              "description": "Fragmento LITERAL de la fuente donde aparece este valor. Si no existe, cadena vacía."
+            }
+          }
+        },
+        "campoNumero": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["valor", "cita"],
+          "properties": {
+            "valor": { "type": "number" },
+            "cita":  { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "vacios": {
+    "texto": "DESCONOCIDO",
+    "numero": 0
+  },
+
+  "unidades": {
+    "equipos[].antiguedad_anios": "anos"
+  },
+
+  "clave_natural": ["sede.nombre"],
+
+  "campos_criticos": [
+    "sede.nombre",
+    "equipos[].modalidad",
+    "equipos[].cantidad"
+  ],
+
+  "$nota_criticos": "Sin sede no se sabe de quién es el inventario, y sin modalidad y cantidad no hay inventario. Todo lo demás enriquece la ficha pero no la bloquea.",
+
+  "$nota_el_error_medido": [
+    "Este esquema es donde se midieron los tres errores reales del 9-sep-2026.",
+    "El texto era: 'tres resonadores magnéticos Siemens y un tomógrafo. UNO de los",
+    "resonadores parece de unos ocho años'. El modelo devolvió, con JSON válido:",
+    "la edad propagada a los TRES resonadores, la marca saltando al tomógrafo, y",
+    "'Confirmado' sobre un 'parece'.",
+    "",
+    "Por eso el proyecto existe, y por eso los tres están como tests."
+  ]
+}
