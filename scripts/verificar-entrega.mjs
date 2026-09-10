@@ -130,6 +130,27 @@ puerta('todas las dependencias declaradas están fijadas', () => {
   return { ok: sueltas.length === 0, detalle: sueltas.join(', ') }
 }, 'un ^ resuelve a otra versión en la máquina del juez. Nosotros necesitamos 0.18.2 EXACTA')
 
+puerta('existe package-lock.json y `npm ci` puede correr', () => {
+  // CAZADO CRONOMETRANDO EL CLON LIMPIO, que es exactamente para lo que sirve
+  // ese ejercicio. El README manda `npm ci` y no había lockfile en el repo:
+  // el juez se estrellaba en el paso 2 de la instalación con un EUSAGE.
+  //
+  // Y no es solo que `npm ci` lo exija: sin lockfile, la integridad SHA-512 de
+  // cada paquete no viaja con el repo, y «@qvac/sdk fijado exacto» pasa a ser
+  // una intención en vez de una garantía.
+  const p = join(RAIZ, 'package-lock.json')
+  if (!existsSync(p)) return { ok: false, detalle: 'no existe package-lock.json: `npm ci` falla con EUSAGE' }
+  try {
+    const lock = JSON.parse(readFileSync(p, 'utf8'))
+    if (!(lock.lockfileVersion >= 1)) return { ok: false, detalle: `lockfileVersion ${lock.lockfileVersion}` }
+    const sdk = lock.packages?.['node_modules/@qvac/sdk']
+    if (sdk && sdk.version !== '0.18.2') {
+      return { ok: false, detalle: `el lock trae @qvac/sdk ${sdk.version}, y debe ser 0.18.2` }
+    }
+    return { ok: true, detalle: '' }
+  } catch (e) { return { ok: false, detalle: `lockfile ilegible: ${e.message}` } }
+}, 'el README manda `npm ci`; sin lockfile el juez se estrella en el paso 2')
+
 puerta('todo `npm run` apunta a un archivo que existe', () => {
   // Un comando prometido en el README que revienta con ENOENT delante de quien
   // evalúa vale menos que no haberlo prometido. `npm run setup` apuntaba a un
