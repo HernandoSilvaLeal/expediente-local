@@ -76,6 +76,9 @@ export function cargarEsquema (rutaRelativa) {
     // La identidad del registro, para deduplicar. Si el esquema no la declara,
     // core/dedup.mjs cae al primer campo crítico.
     claveNatural: Object.freeze([...(crudo.clave_natural ?? [])]),
+    // La RUTA de las guardias de dominio, no las guardias. El núcleo no las
+    // carga: solo dice dónde están, y quien arranca decide si las inyecta.
+    guardiasDominio: crudo.guardias_dominio ?? null,
     ruta: rutaRelativa
   })
 }

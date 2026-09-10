@@ -30,6 +30,7 @@ import { parseArgs } from 'node:util'
 
 import { cargarEsquema } from './core/esquema.mjs'
 import { abrirExpediente, aCsv } from './core/expediente.mjs'
+import { cargarDominio } from './scripts/cargar-dominio.mjs'
 
 const { values: op, positionals } = parseArgs({
   allowPositionals: true,
@@ -53,7 +54,16 @@ if (!comando || op.ayuda) { ayuda(); process.exit(comando ? 0 : 1) }
 
 const esquema = cargarEsquema(op.esquema)
 const ruta = op.ledger ?? `datos/${op.expediente}.jsonl`
-const exp = abrirExpediente({ ruta, esquema, id: op.expediente })
+
+// Las reglas de negocio las declara el ESQUEMA y las carga quien arranca.
+// `core/` nunca las importa: ver scripts/cargar-dominio.mjs.
+const dominio = await cargarDominio(esquema, { hoy: new Date() })
+
+const exp = abrirExpediente({
+  ruta, esquema, id: op.expediente,
+  guardiasDominio: dominio.revisar,
+  contextoDominio: dominio.contexto
+})
 
 const V = '\x1b[0;32m', R = '\x1b[0;31m', A = '\x1b[0;33m'
 const C = '\x1b[0;36m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'

@@ -6,7 +6,7 @@
     "scripts/verificar-frontera.mjs",
     "llevan los patrones escritos como regex y se encontrarían a sí mismos"
   ],
-  "fecha": "2026-09-10T05:38:35.479Z",
+  "fecha": "2026-09-10T05:40:24.153Z",
   "llamadas_a_apis_de_ia": 0,
   "_nota_apis": "CERO. No hay ninguna clave de API en el repositorio y ningún módulo llama a un servicio de inferencia remoto. La inferencia ocurre en el proceso local.",
   "nucleo_determinista": {

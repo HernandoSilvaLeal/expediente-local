@@ -1,6 +1,6 @@
 {
   "_": "Las puertas eliminatorias. Cada una anula el trabajo entero por sí sola.",
-  "fecha": "2026-09-10T05:38:38.571Z",
+  "fecha": "2026-09-10T05:40:27.262Z",
   "todas_pasan": true,
   "salida": "VERIFICACIÓN DE ENTREGA   cada línea, algo que descalifica por sí solo\n\n  [ 1/11] cero rutas absolutas de esta máquina             PASS\n  [ 2/11] cero jerga interna en el repo público            PASS\n  [ 3/11] cero placeholders sin rellenar                   PASS\n  [ 4/11] README con sección de base preexistente          PASS\n  [ 5/11] LICENSE presente                                 PASS\n  [ 6/11] todas las dependencias declaradas están fijadas  PASS\n  [ 7/11] existe package-lock.json y `npm ci` puede correr PASS\n  [ 8/11] todo `npm run` apunta a un archivo que existe    PASS\n  [ 9/11] los tests deterministas pasan                    PASS\n  [10/11] la frontera 95/5 aguanta                         PASS\n  [11/11] el smoke sale con JSON válido                    PASS\n\n  11/11 PASS  nada de lo que descalifica está presente",
   "comando": "npm run verify:entrega"

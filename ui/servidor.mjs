@@ -33,6 +33,7 @@ import { calidad, preguntasPendientes } from '../core/calidad.mjs'
 import { agrupar } from '../core/dedup.mjs'
 import { proyectar } from '../core/proyeccion.mjs'
 import { leer as leerLedger, verificarCadena } from '../core/ledger.mjs'
+import { cargarDominio } from '../scripts/cargar-dominio.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const RAIZ = join(AQUI, '..')
@@ -43,6 +44,7 @@ const arg = (n, d) => { const i = argv.indexOf('--' + n); return i === -1 ? d : 
 const PUERTO = Number(arg('puerto', process.env.PORT ?? '7301'))
 const DATOS = join(RAIZ, arg('datos', 'datos'))
 const esquema = cargarEsquema(arg('esquema', 'instancias/banca/esquema.json'))
+const dominio = await cargarDominio(esquema, { hoy: new Date() })
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' }
@@ -97,7 +99,10 @@ const servidor = createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/decidir/') && req.method === 'POST') {
       const id = decodeURIComponent(url.pathname.split('/').pop())
       const cuerpo = await leerCuerpo(req)
-      const exp = abrirExpediente({ ruta: join(DATOS, `${id}.jsonl`), esquema, id })
+      const exp = abrirExpediente({
+        ruta: join(DATOS, `${id}.jsonl`), esquema, id,
+        guardiasDominio: dominio.revisar, contextoDominio: dominio.contexto
+      })
       try {
         const e = exp.decidir(cuerpo.que, { motivo: cuerpo.motivo ?? null })
         return enviar(200, { ok: true, estado: e.estado })
@@ -150,6 +155,7 @@ servidor.listen(PUERTO, '127.0.0.1', () => {
   const V = '\x1b[0;32m', C = '\x1b[0;36m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
   console.log(`\n  ${V}✓${N} ${B}http://127.0.0.1:${PUERTO}${N}`)
   console.log(`  ${G}${esquema.dominio} / ${esquema.entidad} · datos en ${DATOS}${N}`)
+  console.log(`  ${G}reglas de dominio: ${dominio.origen ?? 'ninguna declarada'}${N}`)
   console.log(`  ${G}cero dependencias, cero build. Solo loopback: no se sirve a la red${N}`)
   console.log(`\n  ${C}Ctrl+C para parar${N}\n`)
 })

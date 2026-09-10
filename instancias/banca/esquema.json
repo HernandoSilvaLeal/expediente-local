@@ -106,6 +106,10 @@
 
   "$nota_unidades": "Fuera del json_schema a propósito: el json_schema es la gramática que restringe al modelo (llama.cpp lo compila a GBNF); esto es contrato de validación y lo lee G4. Son dos consumidores distintos y mezclarlos ensucia los dos. Panamá usa el balboa a la par con el dólar y en la calle se dicen ambos: los sinónimos están en core/guardias.mjs.",
 
+  "guardias_dominio": "instancias/banca/guardias.mjs",
+
+  "$nota_guardias_dominio": "El esquema dice DONDE viven sus reglas de negocio, y quien arranca el sistema las carga y las INYECTA. core/ nunca las importa: si lo hiciera, 'el mismo codigo sirve para otro dominio' dejaria de ser cierto. Cambiar de dominio sigue siendo cambiar un .json.",
+
   "clave_natural": ["titular.cedula"],
 
   "$nota_clave_natural": "La identidad de un expediente bancario es la cédula, y compararla normalizada es exacto, instantáneo y explicable. Los embeddings solo harian falta si NO hubiera clave, y entonces vivirian en ia/, no en core/. El corpus tiene medido el peligro de lo contrario: el maximo de similitud legitima observado fue 0,3702 — cualquier umbral absoluto por debajo junta a personas distintas, y por encima no junta nada.",
