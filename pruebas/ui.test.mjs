@@ -418,3 +418,53 @@ test('UI-25 · ⭐ el gerente no captura: es la otra mitad del control dual', as
   assert.match((await r.json()).error, /no puede capturar/)
   assert.equal(existsSync(join(dir, 'EXP-GERENTE.jsonl')), false)
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-7 · LO QUE LA PANTALLA TIENE QUE OFRECER
+//
+//  Escritos ANTES que el código, y por eso empiezan en rojo. Es TDD con un
+//  límite que conviene decir en voz alta: desde aquí no se puede HACER CLIC.
+//  Estos tests comprueban el CONTRATO —que el elemento esté, que la API
+//  responda, que el dato viaje— y el clic lo cubren las pruebas de usuario.
+//  Dar por probado lo que no se probó es cómo se llega a una suite verde con
+//  quince fallos dentro.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-26 · ⭐ el gerente tiene dónde firmar, no solo un endpoint', async () => {
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /api\/decidir/, 'la interfaz tiene que llamar al endpoint que ya existe')
+  assert.match(html, /aprobar/i)
+  assert.match(html, /rechazar/i)
+})
+
+test('UI-27 · el rol se elige en pantalla y se recuerda en el equipo', async () => {
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /id="rol"/, 'un selector, no una URL: en una ponencia hay que poder cambiarlo')
+  // Los tres roles del esquema tienen que estar como opciones.
+  for (const rol of ['oficial', 'aprobador', 'auditor']) {
+    assert.match(html, new RegExp(`value="${rol}"`), `falta la opción ${rol}`)
+  }
+  assert.match(html, /localStorage/, 'y se recuerda en ESTE navegador')
+})
+
+test('UI-28 · se ven TODAS las firmas, no solo la última', async () => {
+  // Con control dual hay dos actores firmando cosas distintas. Enseñar solo la
+  // última esconde justo lo que demuestra la separación de funciones.
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /decisiones\.map/, 'el array entero, no decisiones.at(-1)')
+})
+
+test('UI-29 · la oficial puede capturar desde la pantalla', async () => {
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /<textarea/, 'hace falta dónde escribir lo que dicta el cliente')
+  assert.match(html, /api\/capturar/)
+})
+
+test('UI-30 · la pantalla usa lo que el servidor YA calcula', async () => {
+  // Cuatro datos que el servidor devuelve y el HTML ignoraba. Cero cálculo
+  // nuevo: solo dejar de tirarlos.
+  const html = await (await fetch(`${BASE}/`)).text()
+  for (const dato of ['puedeCerrar', 'porEvidencia', 'criticos']) {
+    assert.match(html, new RegExp(dato), `${dato} se devuelve y no se pinta`)
+  }
+})

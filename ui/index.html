@@ -50,7 +50,12 @@ header .quien input{
   background:#0B1018; color:var(--texto);
   border:1px solid var(--borde); border-radius:6px;
 }
-header .quien input:focus{outline:0; border-color:var(--mint)}
+header .quien input:focus,header .quien select:focus{outline:0; border-color:var(--mint)}
+header .quien select{
+  padding:5px 9px; font:inherit; font-size:12.5px;
+  background:#0B1018; color:var(--texto);
+  border:1px solid var(--borde); border-radius:6px; cursor:pointer;
+}
 header .dominio{
   margin-left:auto; color:var(--mint); font-size:12px;
   border:1px solid var(--mint); border-radius:99px; padding:2px 10px;
@@ -142,10 +147,19 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
        background:#0B1018; color:var(--texto); font:inherit; font-size:13px;
        border:1px solid var(--borde); border-radius:6px}
 .campo:focus{outline:0; border-color:var(--mint)}
+textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
 .btn{margin-top:10px; padding:8px 14px; font:inherit; font-size:13px; font-weight:600;
      color:#06251F; background:var(--mint); border:0; border-radius:6px; cursor:pointer}
 .btn:disabled{opacity:.5; cursor:default}
 .error{color:var(--coral); font-size:12.5px; margin-top:8px; line-height:1.45}
+.botonera{display:flex; gap:9px; margin-top:10px; flex-wrap:wrap}
+/* El reparto por evidencia: cuatro tramos proporcionales, sin números. De un
+   vistazo se ve si un expediente se sostiene en citas firmes o en afirmaciones
+   flojas — que no es lo mismo que estar completo. */
+.reparto{display:flex; gap:2px; height:3px; margin-top:5px; border-radius:99px; overflow:hidden}
+.reparto > i{display:block; background:currentColor}
+.critico{color:var(--gold); font-weight:700; margin-left:4px; cursor:help}
+.btn-no{color:var(--texto); background:transparent; border:1px solid var(--coral)}
 </style>
 </head>
 <body>
@@ -157,11 +171,19 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
   <label class="quien">
     <span>en este equipo:</span>
     <input id="quien" type="text" placeholder="tu nombre y cargo" autocomplete="off">
+    <select id="rol" title="Control dual: quien arma el expediente no es quien lo firma. NO es autenticación.">
+      <option value="">— sin rol —</option>
+      <option value="oficial">oficial de cuenta</option>
+      <option value="aprobador">gerente de sucursal</option>
+      <option value="auditor">auditoría interna</option>
+    </select>
   </label>
 </header>
 
 <main>
   <aside>
+    <div id="captura"></div>
+
     <h2>Expedientes</h2>
     <div id="lista"><p class="aviso">cargando…</p></div>
     <h2 style="margin-top:20px">Leyenda</h2>
@@ -181,11 +203,67 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
 
 <script>
 const $ = (s, d = document) => d.querySelector(s)
+/** El esquema que sirve este servidor. Llega con la lista y lo usa el detalle. */
+let ESQUEMA = {}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 
+/**
+ * El formulario con el que empieza todo: alguien llega a la ventanilla y dicta.
+ *
+ * Solo se le enseña a quien captura. Igual que el panel de firma, esto es
+ * cortesía y no seguridad: el servidor rechaza a quien no puede capturar
+ * aunque nunca abra esta página.
+ */
+function pintarCaptura () {
+  const caja = $('#captura')
+  if (rol() !== 'oficial') { caja.innerHTML = ''; return }
+
+  caja.innerHTML = `
+    <h2>Nuevo expediente</h2>
+    <input class="campo" id="cap-id" type="text" placeholder="Número de expediente">
+    <textarea class="campo" id="cap-texto" rows="5"
+              placeholder="Lo que dicta el cliente, tal cual. No lo resumas: la fuente se guarda entera."></textarea>
+    <button class="btn" id="cap-boton">Capturar</button>
+    <div class="error" id="cap-error" hidden></div>`
+
+  $('#cap-boton').addEventListener('click', async () => {
+    const id = $('#cap-id').value.trim()
+    const texto = $('#cap-texto').value
+    const error = $('#cap-error')
+
+    $('#cap-boton').disabled = true
+    error.hidden = true
+    try {
+      const r = await fetch('/api/capturar/' + encodeURIComponent(id), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rol: rol(), texto })
+      })
+      const d = await r.json()
+      if (!d.ok) {
+        error.textContent = d.error
+        error.hidden = false
+        $('#cap-boton').disabled = false
+        return
+      }
+      $('#cap-id').value = ''
+      $('#cap-texto').value = ''
+      await cargarLista()
+      await abrirExpediente(d.id)
+    } catch (e) {
+      error.textContent = e.message
+      error.hidden = false
+    } finally {
+      $('#cap-boton').disabled = false
+    }
+  })
+}
+
 async function cargarLista () {
+  pintarCaptura()
   const r = await fetch('/api/expedientes')
   const d = await r.json()
+  ESQUEMA = d.esquema
   $('#dominio').textContent = d.esquema.dominio + ' / ' + d.esquema.entidad
 
   if (!d.expedientes.length) {
@@ -220,10 +298,35 @@ async function cargarLista () {
       </div>`
     return
   }
-  $('#lista').innerHTML = d.expedientes.map(e => `
+  // ── LA BANDEJA DE CADA QUIEN ─────────────────────────────────────────────
+  //
+  // `puedeCerrar` lo calcula el servidor desde siempre y el HTML lo tiraba. Un
+  // gerente no quiere la lista entera: quiere lo que espera su firma. Cero
+  // cálculo nuevo — solo dejar de desperdiciar lo que ya viene.
+  const orden = rol() === 'aprobador'
+    ? [...d.expedientes].sort((a, b) => Number(b.puedeCerrar) - Number(a.puedeCerrar))
+    : d.expedientes
+  const esperan = d.expedientes.filter(e => e.puedeCerrar && e.estado === 'COMPLETO').length
+
+  // ── DOS EXPEDIENTES DE LA MISMA PERSONA ──────────────────────────────────
+  //
+  // `grupos` lo devuelve /api/expedientes desde siempre y el HTML lo ignoraba.
+  // No es un dato sucio: es un hueco de debida diligencia, porque cada mitad se
+  // revisa contra la mitad de la información. Merece decirse arriba del todo.
+  const duplicados = (d.grupos ?? []).filter(g => (g.miembros ?? g.ids ?? []).length > 1)
+
+  $('#lista').innerHTML =
+    (duplicados.length
+      ? `<p class="aviso" style="padding-top:0;color:var(--gold)">⚠ ${duplicados.length} ${duplicados.length === 1 ? 'grupo de expedientes parece' : 'grupos de expedientes parecen'} la misma persona</p>`
+      : '') +
+    (rol() === 'aprobador' && esperan
+      ? `<p class="aviso" style="padding-top:0">${esperan} ${esperan === 1 ? 'espera tu firma' : 'esperan tu firma'}</p>`
+      : '') +
+    orden.map(e => `
     <div class="exp" data-id="${esc(e.id)}" role="button" tabindex="0">
       <div class="id">${esc(e.id)} <span class="estado e-${esc(e.estado)}">${esc(e.estado)}</span></div>
       <div class="meta">${e.anclados} anclados · ${e.huecos} huecos${e.duplicadoDe ? ' · dup. de ' + esc(e.duplicadoDe) : ''}</div>
+      ${reparto(e.porEvidencia)}
       <div class="barra"><i style="width:${Math.round(e.completitud * 100)}%"></i></div>
     </div>`).join('')
 
@@ -235,11 +338,33 @@ async function cargarLista () {
   abrirExpediente(d.expedientes[0].id)
 }
 
+/**
+ * El reparto por grado de evidencia, en una barra de cuatro tramos.
+ *
+ * `porEvidencia` venía en cada expediente desde el principio y nadie lo
+ * pintaba. Dice de un vistazo si un expediente está sostenido por citas firmes
+ * o por afirmaciones flojas — que es distinto de estar completo.
+ */
+function reparto (porEvidencia) {
+  if (!porEvidencia) return ''
+  const grados = ['Confirmado', 'Reportado', 'Estimado', 'Desconocido']
+  const total = grados.reduce((a, g) => a + (porEvidencia[g] ?? 0), 0)
+  if (!total) return ''
+  return '<div class="reparto">' + grados.map(g => {
+    const n = porEvidencia[g] ?? 0
+    return n ? `<i class="ev-${g}" style="flex:${n}" title="${n} ${g}"></i>` : ''
+  }).join('') + '</div>'
+}
+
 async function abrirExpediente (id) {
   for (const el of document.querySelectorAll('.exp')) {
     el.setAttribute('aria-current', String(el.dataset.id === id))
   }
   const d = await (await fetch('/api/expediente/' + encodeURIComponent(id))).json()
+  // `criticos` llega en /api/expedientes y también se ignoraba. Un campo que la
+  // norma exige no es igual que uno opcional, y la pantalla debería decirlo.
+  const criticos = new Set(ESQUEMA.criticos ?? [])
+  const esCritico = (ruta) => criticos.has(ruta) || criticos.has(ruta.replace(/\[\d+\]/, '[]'))
   if (d.error) { $('#detalle').innerHTML = '<p class="aviso">' + esc(d.error) + '</p>'; return }
 
   const e = d.expediente
@@ -256,7 +381,7 @@ async function abrirExpediente (id) {
         <tr><th>Campo</th><th>Valor</th><th>Evidencia</th></tr>
         ${campos.map(([ruta, c]) => `
           <tr>
-            <td class="ruta mono">${esc(ruta)}</td>
+            <td class="ruta mono">${esc(ruta)}${esCritico(ruta) ? '<span class="critico" title="lo exige el Acuerdo 1-2026">·</span>' : ''}</td>
             <td><b>${esc(c.valor)}</b>${c.cita ? `<div class="cita">«${esc(c.cita)}»</div>` : ''}</td>
             <td><span class="ev ev-${esc(c.evidencia)}">${esc(c.evidencia)}</span></td>
           </tr>`).join('')}
@@ -276,17 +401,39 @@ async function abrirExpediente (id) {
       </table>
     </div>` : ''}
 
-    ${(e.decisiones || []).length ? (d => `<div class="tarjeta">
+    ${(e.decisiones || []).length ? `<div class="tarjeta">
       <h2>Quién firmó</h2>
+      <p class="aviso" style="padding-top:0">
+        con control dual, la firma la pone alguien distinto de quien armó el
+        expediente — así que se ven todas, no la última.
+      </p>
       <table>
-        <tr>
-          <td class="ruta mono">${esc(d.que)}</td>
-          <td><b>${esc(d.oficial || '—')}</b>
-            <div class="motivo">${esc(d.ts)}</div>
-            ${d.motivo ? `<div class="cita">«${esc(d.motivo)}»</div>` : ''}</td>
-        </tr>
+        ${e.decisiones.map(d => `
+          <tr>
+            <td class="ruta mono">${esc(d.que)}</td>
+            <td><b>${esc(d.oficial || '—')}</b>
+              <div class="motivo">${esc(d.ts)}</div>
+              ${d.motivo ? `<div class="cita">«${esc(d.motivo)}»</div>` : ''}</td>
+          </tr>`).join('')}
       </table>
-    </div>`)(e.decisiones[e.decisiones.length - 1]) : ''}
+    </div>` : ''}
+
+    ${puedeFirmar(e) ? `<div class="tarjeta">
+      <h2>Firmar el expediente</h2>
+      <p class="aviso" style="padding-top:0">
+        El software nunca aprueba solo. Firmar es un acto humano, y queda con
+        nombre dentro de la cadena de hashes: cambiarlo la rompe.
+      </p>
+      <div class="firma">
+        <input class="campo" id="firma-motivo" type="text"
+               placeholder="Por qué apruebas o rechazas — queda en el expediente">
+        <div class="botonera">
+          <button class="btn" data-firma="aprobar">Aprobar</button>
+          <button class="btn btn-no" data-firma="rechazar">Rechazar</button>
+        </div>
+        <div class="error" id="firma-error" hidden></div>
+      </div>
+    </div>` : ''}
 
     ${(e.conflictos || []).length ? `<div class="tarjeta hueco">
       <h2>⚔ Dos fuentes se contradicen</h2>
@@ -364,6 +511,68 @@ async function abrirExpediente (id) {
     </div>`
 
   cablearConflictos(e.id)
+  cablearFirma(e.id)
+}
+
+/**
+ * ¿Se le enseña a esta persona el panel de firma?
+ *
+ * Esconder el botón NO es aplicar el rol: eso lo hace el servidor, que devuelve
+ * 403 aunque nadie abra la interfaz. Esto es cortesía — no ofrecerle a la
+ * oficial de ventanilla un botón que va a rechazarla.
+ *
+ * Y hace falta que el expediente esté en un estado que admita firma: un
+ * expediente con un conflicto abierto no se firma, y el núcleo lo impide.
+ */
+function puedeFirmar (e) {
+  return rol() === 'aprobador' && e.estado === 'COMPLETO'
+}
+
+// ── LA SEGUNDA ZONA DE ESCRITURA DE LA INTERFAZ ────────────────────────────
+//
+// La primera es resolver un conflicto; esta es firmar. Y son de personas
+// distintas a propósito: es el control dual, no una limitación técnica.
+//
+// Igual que en la otra: la validación NO se duplica aquí. El error del núcleo
+// se enseña tal cual, porque está escrito para que lo lea una persona.
+function cablearFirma (id) {
+  const error = $('#firma-error')
+  if (!error) return
+
+  for (const boton of document.querySelectorAll('[data-firma]')) {
+    boton.addEventListener('click', async () => {
+      const que = boton.dataset.firma
+      const cuerpo = {
+        que,
+        rol: rol(),
+        oficial: quien(),
+        motivo: $('#firma-motivo').value
+      }
+
+      for (const b of document.querySelectorAll('[data-firma]')) b.disabled = true
+      error.hidden = true
+      try {
+        const r = await fetch('/api/decidir/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(cuerpo)
+        })
+        const d = await r.json()
+        if (!d.ok) {
+          error.textContent = d.error
+          error.hidden = false
+          for (const b of document.querySelectorAll('[data-firma]')) b.disabled = false
+          return
+        }
+        await abrirExpediente(id)
+        await cargarLista()
+      } catch (e) {
+        error.textContent = e.message
+        error.hidden = false
+        for (const b of document.querySelectorAll('[data-firma]')) b.disabled = false
+      }
+    })
+  }
 }
 
 // ── EL ÚNICO SITIO DE LA INTERFAZ QUE ESCRIBE ──────────────────────────────
@@ -464,7 +673,30 @@ function normalizar (s) {
 // Y se dice lo que es: una comodidad. La identidad verificada la pondría el
 // directorio del banco; aquí no la hay, y está declarado en el README.
 const QUIEN = 'expediente-local:quien'
+const ROL = 'expediente-local:rol'
 const quien = () => { try { return localStorage.getItem(QUIEN) || '' } catch { return '' } }
+
+/**
+ * El rol de ESTE equipo.
+ *
+ * Se elige en pantalla y no por la URL: en una ponencia grabada, poder cambiar
+ * de rol sin tocar la dirección ni reiniciar nada es lo que salva una toma.
+ *
+ * ⚠️ No es autenticación, y la interfaz lo dice en el propio `title` del
+ * selector. Nadie comprueba que quien dice ser el gerente lo sea. Lo que impide
+ * es que un rol haga lo que su rol no hace — que es más modesto y más honesto.
+ * La identidad verificada la pone el directorio del banco.
+ */
+const rol = () => { try { return localStorage.getItem(ROL) || '' } catch { return '' } }
+
+$('#rol').value = rol()
+$('#rol').addEventListener('change', async e => {
+  try { localStorage.setItem(ROL, e.target.value) } catch { /* modo privado */ }
+  // La pantalla cambia con el rol: el gerente no ve el formulario de captura y
+  // la oficial no ve el de firma. Es comodidad, NO seguridad — quien decide de
+  // verdad es el servidor.
+  await cargarLista()
+})
 
 $('#quien').value = quien()
 $('#quien').title = 'Se recuerda en este equipo. No es autenticación: la identidad ' +
