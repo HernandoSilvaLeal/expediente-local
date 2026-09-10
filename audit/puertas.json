@@ -5,14 +5,14 @@
   "bronce_sin_red": true,
   "bronce_readme_instalacion": true,
   "plata_casos_crudo": false,
-  "plata_audit_all": false,
+  "plata_audit_all": true,
   "oro_p2p_fisico": false,
   "oro_voz": false,
   "oro_delegacion": false,
   "oro_segundo_dominio": false,
   "desc_video_duracion": false,
   "desc_video_acceso": false,
-  "desc_repo_publico": false,
+  "desc_repo_publico": true,
   "desc_clon_limpio": true,
   "desc_formulario": false,
   "_bitacora": {
@@ -20,7 +20,10 @@
     "_leccion": "Se interpreto un numero como sintoma de averia sin buscar antes cual era el valor esperado. El valor esperado estaba escrito en un comentario dentro del paquete que ya teniamos instalado.",
     "bronce_sin_red": "10-sep 00:1x — MEDIDO. `unshare -rn bash -c 'node scripts/smoke.mjs'`: dentro del espacio de red, `ip link` muestra solo `lo: DOWN`, `curl` a npmjs devuelve codigo HTTP 000, y el smoke recorre el flujo completo y sale con JSON valido y codigo 0. Es el plano B del video.",
     "oro_delegacion": "10-sep 00:2x — MEDIO PROBADA. El PROVEEDOR arranca de verdad contra @qvac/sdk 0.18.2 en esta maquina: startQVACProvider devolvio clave publica en 8.419 ms. Es media delegacion: falta la otra mitad, que es un consumidor conectandose y recibiendo inferencia. Hasta que eso este grabado, se escribe NO MEDIDO.",
-    "clon_limpio": "10-sep 00:2x — MEDIDO en clon limpio con HOME nuevo, sin cache de npm. clone 2 s + npm ci 190 s = 192 s, y de ahi: 267/267 tests, frontera intacta, smoke OK y 11/11 puertas de entrega. TOTAL DE CERO A FUNCIONANDO: 193 s (3 min 13 s). Y cazo el fallo que buscaba: FALTABA package-lock.json, asi que 'npm ci' —lo que manda el README— reventaba con EUSAGE. Un juez siguiendo el README se estrellaba en el paso 2."
+    "clon_limpio": "10-sep 00:2x — MEDIDO en clon limpio con HOME nuevo, sin cache de npm. clone 2 s + npm ci 190 s = 192 s, y de ahi: 267/267 tests, frontera intacta, smoke OK y 11/11 puertas de entrega. TOTAL DE CERO A FUNCIONANDO: 193 s (3 min 13 s). Y cazo el fallo que buscaba: FALTABA package-lock.json, asi que 'npm ci' —lo que manda el README— reventaba con EUSAGE. Un juez siguiendo el README se estrellaba en el paso 2.",
+    "desc_repo_publico": "10-sep 04:3x — MEDIDO SIN SESION, con curl desde fuera. raiz HTTP 200, README 200, audit/EVIDENCE_MAP.md 200, package-lock.json 200. La API publica confirma: private=false, licencia Apache-2.0, rama por defecto main, 684 KB. Cualquiera puede clonarlo sin cuenta.",
+    "plata_audit_all": "10-sep — MEDIDO. `npm run audit:all` regenera ocho artefactos: remote_calls, hardware, tests, determinismo, invariantes, entrega, inference_log (vacio a proposito) y EVIDENCE_MAP. Y ademas existen clon-limpio.json y setup.json.",
+    "plata_casos_crudo": "10-sep — NO SE PODRA CUMPLIR COMO ESTABA ESCRITA. pruebas-philips.json vivia en /tmp y se perdio; el plan lo tenia como accion P0 precisamente por eso. Eran los 13 casos oficiales del track de Philips, que NO es el nuestro, y servian como arnes de regresion. SUSTITUTO, y es mejor argumento: `npm run casos` corre 13 casos trampa propios con cobertura G1..G8 completa, cuatro de ellos salidas REALES del modelo; e instancias/salud/ demuestra el core generico con NUESTROS errores medidos en vez de un examen ajeno. Se deja esta casilla en false porque la casilla decia 'los 13 casos OFICIALES', y marcarla seria cambiar el significado de una casilla para poder marcarla."
   },
   "_promovidas": "desc_base_preexistente, desc_sin_rutas_absolutas y desc_sin_placeholders salieron de este archivo el 10-sep: ahora las verifica scripts/verificar-entrega.mjs y son casillas MEDIDAS. Mover casillas en esa direccion es el unico progreso real del tablero. El movimiento contrario, nunca."
 }
