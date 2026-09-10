@@ -297,7 +297,11 @@ if (soloJson) {
   console.log(JSON.stringify({
     _: 'Marcador de la fase PLATA. Cada ítem se comprueba ejecutando, no se declara.',
     fecha: new Date().toISOString(),
-    porcentaje: pct, hechos, total,
+    porcentaje_comprobable: pct,
+    porcentaje_fase: Math.round((hechos / (total + MANUAL.length)) * 100),
+    hechos,
+    total_comprobable: total,
+    total_fase: total + MANUAL.length,
     frentes: informe.map(f => ({ id: f.id, titulo: f.titulo, hechos: f.hechos, total: f.total,
                                  items: f.resultados })),
     manual: MANUAL.map(([id, que]) => ({ id, que, comprobable: false })),
@@ -325,10 +329,22 @@ for (const f of informe) {
 }
 
 console.log(`  ${G}────────────────────────────────────────────────────────────${N}`)
-console.log(`  ${barra(hechos, total, 30)}  ${B}${pct === 100 ? V : pct >= 50 ? A : R}${pct} %${N}   ${G}${hechos} de ${total} comprobables${N}\n`)
+console.log(`  ${barra(hechos, total, 30)}  ${B}${pct === 100 ? V : pct >= 50 ? A : R}${pct} %${N}   ${G}${hechos} de ${total} comprobables por comando${N}\n`)
 
 console.log(`  ${B}Y LO QUE NINGÚN COMANDO PUEDE DECIR${N}   ${G}se cuenta aparte, o el marcador se marca solo${N}`)
 for (const [id, que] of MANUAL) console.log(`      ${A}○${N} ${G}${id.padEnd(4)} ${que}${N}`)
+
+// ── EL NÚMERO QUE DE VERDAD DICE DÓNDE ESTAMOS ────────────────────────────
+//
+// El porcentaje de arriba mide lo comprobable, y leído solo se interpreta como
+// «casi terminado» cuando faltan cinco cosas que ningún comando puede firmar.
+// Los manuales cuentan como PENDIENTES en el total, no como una nota al pie:
+// esconderlos del número es exactamente cómo un frente se autosella.
+const totalFase = total + MANUAL.length
+const pctFase = Math.round((hechos / totalFase) * 100)
+
+console.log(`\n  ${G}────────────────────────────────────────────────────────────${N}`)
+console.log(`  ${barra(hechos, totalFase, 30)}  ${B}${pctFase === 100 ? V : pctFase >= 50 ? A : R}${pctFase} %${N}   ${B}LA FASE ENTERA${N}   ${G}${hechos} de ${totalFase} · los ${MANUAL.length} manuales cuentan${N}`)
 
 console.log(`\n  ${G}PLATA cierra con el 100 % de arriba Y las cinco de abajo.${N}`)
 console.log(`  ${G}Un criterio incumplido y declarado vale más que uno cumplido a medias.${N}\n`)
