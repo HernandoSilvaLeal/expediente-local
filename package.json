@@ -19,6 +19,8 @@
     "verify:entrega": "node scripts/verificar-entrega.mjs",
     "metricas": "node scripts/metricas.mjs",
     "metricas:json": "node scripts/metricas.mjs --json",
+    "plata": "node scripts/plata.mjs",
+    "plata:json": "node scripts/plata.mjs --json",
     "verify:invariantes": "node scripts/verificar-invariantes.mjs",
     "audit:all": "node scripts/audit-all.mjs",
     "casos": "node scripts/casos.mjs"

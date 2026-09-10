@@ -6,7 +6,7 @@
 **Por qué existe este archivo:** porque nadie entrega el mapa que hace su propio trabajo fácil
 de auditar, y es exactamente lo que convierte «confíe en mí» en «compruébelo usted».
 
-Regenerado: 2026-09-10T17:16:25.459Z
+Regenerado: 2026-09-10T17:21:50.233Z
 
 | Afirmación | Dónde vive | Evidencia | Comando |
 |---|---|---|---|
