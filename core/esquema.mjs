@@ -73,6 +73,9 @@ export function cargarEsquema (rutaRelativa) {
     // restringe al modelo. Esto es contrato de validación, que es otra cosa
     // y la lee otro consumidor (G4).
     unidades: Object.freeze({ ...(crudo.unidades ?? {}) }),
+    // La identidad del registro, para deduplicar. Si el esquema no la declara,
+    // core/dedup.mjs cae al primer campo crítico.
+    claveNatural: Object.freeze([...(crudo.clave_natural ?? [])]),
     ruta: rutaRelativa
   })
 }
