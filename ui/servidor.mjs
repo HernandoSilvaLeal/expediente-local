@@ -23,6 +23,7 @@
 // PROHIBIDO aquí: importar @qvac/sdk. Verificado por scripts/verificar-frontera.mjs
 
 import { createServer } from 'node:http'
+import { networkInterfaces } from 'node:os'
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -223,11 +224,17 @@ function escrituraRechazada (req, url) {
     return { codigo: 415, error: 'las escrituras exigen content-type: application/json' }
   }
 
-  // 2 · El origen tiene que ser este mismo servidor. Si no hay cabecera es que
+  // 2 · El origen tiene que ser ESTE MISMO servidor. Si no hay cabecera es que
   //     no viene de un navegador (curl, un script): eso se permite, porque es
   //     exactamente cómo el juez reproduce la demostración desde la terminal.
+  //
+  //     «Este mismo servidor» se deduce de la cabecera Host, no de una
+  //     constante: cuando la tableta de ventanilla abre la interfaz por la IP
+  //     de la sucursal, su Origin es esa IP y no 127.0.0.1. Comparar contra un
+  //     literal dejaba fuera al único dispositivo para el que se abrió el
+  //     servidor a la red — verificado antes de que pasara en una demostración.
   const origen = req.headers.origin
-  if (origen && origen !== `http://127.0.0.1:${PUERTO}` && origen !== `http://localhost:${PUERTO}`) {
+  if (origen && origen !== `http://${req.headers.host}` && origen !== `https://${req.headers.host}`) {
     return { codigo: 403, error: `una página de ${origen} no escribe en un expediente de esta sucursal` }
   }
   // Y si el navegador dice de dónde viene, se le cree cuando dice que es de fuera.
@@ -252,14 +259,45 @@ function leerCuerpo (req) {
   })
 }
 
-servidor.listen(PUERTO, '127.0.0.1', () => {
-  const V = '\x1b[0;32m', C = '\x1b[0;36m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
-  console.log(`\n  ${V}✓${N} ${B}http://127.0.0.1:${PUERTO}${N}`)
+// ── A QUÉ INTERFAZ SE ESCUCHA, Y POR QUÉ HAY QUE PEDIRLO ──────────────────
+//
+// Por defecto, SOLO loopback: un expediente bancario no se sirve a la red
+// porque alguien arrancó la demo en un café. Esa sigue siendo la postura.
+//
+// Pero una sucursal de verdad tiene la tableta de ventanilla y el equipo del
+// fondo, y son dos máquinas. Para eso está `--host 0.0.0.0`: hay que
+// escribirlo, se avisa en pantalla de lo que implica, y quien lo escribe sabe
+// lo que hace. Un valor por defecto que expone a la red es un accidente
+// esperando; una bandera explícita es una decisión.
+const HOST = arg('host', '127.0.0.1')
+const ABIERTO = HOST !== '127.0.0.1' && HOST !== 'localhost'
+
+servidor.listen(PUERTO, HOST, () => {
+  const V = '\x1b[0;32m', A = '\x1b[0;33m', C = '\x1b[0;36m'
+  const G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
+  console.log(`\n  ${V}✓${N} ${B}http://${ABIERTO ? ipDeLan() : '127.0.0.1'}:${PUERTO}${N}`)
   console.log(`  ${G}${esquema.dominio} / ${esquema.entidad} · datos en ${DATOS}${N}`)
   console.log(`  ${G}reglas de dominio: ${dominio.origen ?? 'ninguna declarada'}${N}`)
-  console.log(`  ${G}cero dependencias, cero build. Solo loopback: no se sirve a la red${N}`)
+  if (ABIERTO) {
+    console.log(`\n  ${A}${B}⚠ ABIERTO A LA RED LOCAL${N}  ${G}(--host ${HOST})${N}`)
+    console.log(`  ${G}cualquiera en esta red puede abrir y firmar expedientes: aquí no hay`)
+    console.log(`  autenticación. Vale para una red aislada de sucursal, no para un café.${N}`)
+  } else {
+    console.log(`  ${G}cero dependencias, cero build. Solo loopback: no se sirve a la red${N}`)
+    console.log(`  ${G}para la tableta de ventanilla:  --host 0.0.0.0${N}`)
+  }
   console.log(`\n  ${C}Ctrl+C para parar${N}\n`)
 })
+
+/** La IP de LAN, para poder teclearla en la tableta sin ir a buscarla. */
+function ipDeLan () {
+  for (const listas of Object.values(networkInterfaces())) {
+    for (const i of listas ?? []) {
+      if (i.family === 'IPv4' && !i.internal) return i.address
+    }
+  }
+  return HOST
+}
 
 process.once('SIGINT', () => { servidor.close(); process.exit(0) })
 process.once('SIGTERM', () => { servidor.close(); process.exit(0) })

@@ -39,6 +39,18 @@ header{
 }
 header h1{margin:0; font-size:17px; letter-spacing:.2px}
 header .lema{color:var(--tenue); font-size:13px}
+/* ── QUIÉN ESTÁ EN ESTE EQUIPO ────────────────────────────────────────────
+   NO es autenticación, y la interfaz lo dice en su propio título: es una
+   comodidad para que la oficial de ventanilla no reescriba su nombre en cada
+   firma. Se guarda en ESTE navegador y no sale de él. En una instalación de
+   verdad, esta identidad la pone el sistema del banco, no un campo de texto. */
+header .quien{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--apagado)}
+header .quien input{
+  width:230px; padding:5px 9px; font:inherit; font-size:12.5px;
+  background:#0B1018; color:var(--texto);
+  border:1px solid var(--borde); border-radius:6px;
+}
+header .quien input:focus{outline:0; border-color:var(--mint)}
 header .dominio{
   margin-left:auto; color:var(--mint); font-size:12px;
   border:1px solid var(--mint); border-radius:99px; padding:2px 10px;
@@ -126,6 +138,10 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
   <h1>Expediente&nbsp;Local</h1>
   <span class="lema">el modelo propone · el código decide · una persona aprueba</span>
   <span class="dominio" id="dominio">—</span>
+  <label class="quien">
+    <span>en este equipo:</span>
+    <input id="quien" type="text" placeholder="tu nombre y cargo" autocomplete="off">
+  </label>
 </header>
 
 <main>
@@ -272,7 +288,8 @@ async function abrirExpediente (id) {
               <span><b>${esc(v)}</b> <span class="motivo">— ${etiq}</span>
                 <div class="cita">«${esc(cita)}»</div></span>
             </label>`).join('')}
-          <input class="campo" data-of type="text" placeholder="Quién resuelve — nombre y cargo">
+          <input class="campo" data-of type="text" value="${esc(quien())}"
+                 placeholder="Quién resuelve — nombre y cargo">
           <input class="campo" data-mot type="text" placeholder="Por qué: qué documento tienes delante que el sistema no puede ver">
           <button class="btn" data-i="${i}">Resolver y firmar la decisión</button>
           <div class="error" hidden></div>
@@ -333,6 +350,8 @@ async function abrirExpediente (id) {
 function cablearConflictos (id) {
   for (const caja of document.querySelectorAll('.conflicto')) {
     const boton = caja.querySelector('.btn')
+    // Si la persona escribe aquí a mano, deja de seguir a la barra de arriba.
+    caja.querySelector('[data-of]').addEventListener('input', e => { e.target.dataset.tocado = '1' })
     const error = caja.querySelector('.error')
 
     boton.addEventListener('click', async () => {
@@ -362,7 +381,26 @@ function cablearConflictos (id) {
           return
         }
         await abrirExpediente(id)
-        await cargarLista()
+        await // ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────
+//
+// Se guarda en este navegador y NO viaja a ningún sitio salvo dentro de la
+// firma que la persona envía. Es lo que hace que la tableta de Marta sea «la
+// tableta de Marta» sin haber instalado nada en ella.
+//
+// Y se dice lo que es: una comodidad. La identidad verificada la pondría el
+// directorio del banco; aquí no la hay, y está declarado en el README.
+const QUIEN = 'expediente-local:quien'
+const quien = () => { try { return localStorage.getItem(QUIEN) || '' } catch { return '' } }
+
+$('#quien').value = quien()
+$('#quien').title = 'Se recuerda en este equipo. No es autenticación: la identidad ' +
+                    'verificada la pone el sistema del banco.'
+$('#quien').addEventListener('input', e => {
+  try { localStorage.setItem(QUIEN, e.target.value) } catch { /* modo privado: se sigue */ }
+  for (const c of document.querySelectorAll('[data-of]')) if (!c.dataset.tocado) c.value = e.target.value
+})
+
+cargarLista()
       } catch (e) {
         error.textContent = e.message
         error.hidden = false
@@ -371,6 +409,25 @@ function cablearConflictos (id) {
     })
   }
 }
+
+// ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────
+//
+// Se guarda en este navegador y NO viaja a ningún sitio salvo dentro de la
+// firma que la persona envía. Es lo que hace que la tableta de Marta sea «la
+// tableta de Marta» sin haber instalado nada en ella.
+//
+// Y se dice lo que es: una comodidad. La identidad verificada la pondría el
+// directorio del banco; aquí no la hay, y está declarado en el README.
+const QUIEN = 'expediente-local:quien'
+const quien = () => { try { return localStorage.getItem(QUIEN) || '' } catch { return '' } }
+
+$('#quien').value = quien()
+$('#quien').title = 'Se recuerda en este equipo. No es autenticación: la identidad ' +
+                    'verificada la pone el sistema del banco.'
+$('#quien').addEventListener('input', e => {
+  try { localStorage.setItem(QUIEN, e.target.value) } catch { /* modo privado: se sigue */ }
+  for (const c of document.querySelectorAll('[data-of]')) if (!c.dataset.tocado) c.value = e.target.value
+})
 
 cargarLista()
 </script>
