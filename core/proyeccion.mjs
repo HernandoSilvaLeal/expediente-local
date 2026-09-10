@@ -60,6 +60,7 @@ export function proyectar (eventos) {
     estado: null,
     fuentes: [],
     campos: new Map(),
+    huecos: new Map(),
     propuestos: 0,
     rechazados: 0,
     duplicadoDe: null,
@@ -94,9 +95,25 @@ function aplicar (exp, e) {
     }
 
     case EVENTO.REVISION: {
-      // Lo que las guardias DECIDIERON. Solo lo aceptado entra.
+      // Lo que las guardias DECIDIERON.
       for (const c of e.datos.campos ?? []) {
-        if (!c.aceptado) { exp.rechazados++; continue }
+        if (!c.aceptado) {
+          exp.rechazados++
+          // El rechazo NO se descarta: se conserva con su motivo, porque es lo
+          // que contesta «¿por qué le falta este dato al expediente?». Un
+          // dataset que no puede explicar sus huecos es un dataset en el que
+          // hay que creer.
+          exp.huecos.set(c.ruta, Object.freeze({
+            ruta: c.ruta,
+            guardias: Object.freeze((c.rechazos ?? []).map(r => r.guardia)),
+            motivos: Object.freeze((c.rechazos ?? []).map(r => r.motivo)),
+            seq: e.seq
+          }))
+          continue
+        }
+        // Un campo que ANTES fue rechazado y ahora ancla deja de ser un hueco:
+        // la segunda observación lo resolvió, y el expediente lo refleja.
+        exp.huecos.delete(c.ruta)
         asentar(exp, c, e)
       }
       break
@@ -190,10 +207,16 @@ function congelar (exp, eventos) {
   const campos = {}
   for (const ruta of [...exp.campos.keys()].sort()) campos[ruta] = exp.campos.get(ruta)
 
+  // Los huecos también salen ordenados por ruta, y por la misma razón: dos
+  // dispositivos con los mismos hechos tienen que serializar el mismo JSON.
+  const huecos = {}
+  for (const ruta of [...exp.huecos.keys()].sort()) huecos[ruta] = exp.huecos.get(ruta)
+
   return Object.freeze({
     id: exp.id,
     estado: exp.estado,
     campos: Object.freeze(campos),
+    huecos: Object.freeze(huecos),
     fuentes: Object.freeze(exp.fuentes.map(Object.freeze)),
     duplicadoDe: exp.duplicadoDe,
     historial: Object.freeze(exp.historial.map(Object.freeze)),
@@ -203,6 +226,7 @@ function congelar (exp, eventos) {
       eventos: eventos.length,
       camposAsentados: Object.keys(campos).length,
       camposRechazados: exp.rechazados,
+      huecosAbiertos: Object.keys(huecos).length,
       camposPropuestos: exp.propuestos,
       ultimoHash: eventos[eventos.length - 1]?.hash ?? null,
       porEvidencia: contarPorEvidencia(campos)
@@ -218,11 +242,11 @@ function contarPorEvidencia (campos) {
 
 function vacio () {
   return Object.freeze({
-    id: null, estado: null, campos: Object.freeze({}), fuentes: Object.freeze([]),
+    id: null, estado: null, campos: Object.freeze({}), huecos: Object.freeze({}), fuentes: Object.freeze([]),
     duplicadoDe: null, historial: Object.freeze([]), decisiones: Object.freeze([]),
     contradicciones: Object.freeze([]),
     resumen: Object.freeze({
-      eventos: 0, camposAsentados: 0, camposRechazados: 0, camposPropuestos: 0,
+      eventos: 0, camposAsentados: 0, camposRechazados: 0, huecosAbiertos: 0, camposPropuestos: 0,
       ultimoHash: null, porEvidencia: contarPorEvidencia({})
     })
   })
