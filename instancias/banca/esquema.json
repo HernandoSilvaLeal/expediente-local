@@ -1,0 +1,101 @@
+{
+  "$comentario": [
+    "ESQUEMA DE ENTIDAD — expediente de cliente de una sucursal bancaria.",
+    "",
+    "Este archivo es DATO, no código. El núcleo no sabe de banca: lee este esquema",
+    "al arrancar y se comporta en consecuencia. Cambiarlo por instancias/salud/esquema.json",
+    "convierte el mismo binario en un extractor de inventario hospitalario.",
+    "",
+    "Sirve a tres funciones a la vez:",
+    "  1. La gramática que restringe al modelo (json_schema → GBNF en llama.cpp)",
+    "  2. El contrato de validación de las guardias deterministas",
+    "  3. El contrato de sincronización entre pares de la malla",
+    "",
+    "REGLA DE ORO: cada campo extraído lleva su CITA. Una función pura comprueba que",
+    "la cita sea substring normalizado de la fuente. Si no lo es, el campo vale DESCONOCIDO.",
+    "El modelo no puede alucinar una cita que el software va a buscar con indexOf."
+  ],
+
+  "dominio": "banca",
+  "version": "1.0.0",
+  "entidad": "expediente",
+  "descripcion": "Expediente de apertura de cuenta de un cliente en sucursal",
+
+  "json_schema": {
+    "name": "expediente",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titular", "documentos"],
+      "properties": {
+        "titular": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nombre", "cedula"],
+          "properties": {
+            "nombre":  { "$ref": "#/$defs/campoTexto" },
+            "cedula":  { "$ref": "#/$defs/campoTexto" }
+          }
+        },
+        "documentos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tipo", "emisor", "fecha_emision", "monto", "confianza"],
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": ["CEDULA", "RECIBO_SERVICIO", "CARTA_LABORAL", "FORMULARIO", "DESCONOCIDO"]
+              },
+              "emisor":        { "$ref": "#/$defs/campoTexto" },
+              "fecha_emision": { "$ref": "#/$defs/campoTexto" },
+              "monto":         { "$ref": "#/$defs/campoNumero" },
+              "confianza": {
+                "type": "string",
+                "enum": ["Confirmado", "Reportado", "Estimado", "Desconocido"]
+              }
+            }
+          }
+        }
+      },
+      "$defs": {
+        "campoTexto": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["valor", "cita"],
+          "properties": {
+            "valor": { "type": "string" },
+            "cita":  {
+              "type": "string",
+              "description": "Fragmento LITERAL de la fuente donde aparece este valor. Si no existe, cadena vacía."
+            }
+          }
+        },
+        "campoNumero": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["valor", "cita"],
+          "properties": {
+            "valor": { "type": "number" },
+            "cita":  { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+
+  "vacios": {
+    "texto": "DESCONOCIDO",
+    "numero": 0,
+    "confianza": "Desconocido"
+  },
+
+  "campos_criticos": [
+    "titular.cedula",
+    "documentos[].tipo",
+    "documentos[].fecha_emision"
+  ],
+
+  "$nota_campos_criticos": "Un expediente al que le falte uno de estos NO puede llegar a estado COMPLETO. Es lo que dispara la repregunta determinista."
+}

@@ -5,13 +5,15 @@
   "type": "module",
   "description": "Admisión de expedientes de cliente en sucursal bancaria, con toda la inferencia en el dispositivo.",
   "license": "Apache-2.0",
-  "engines": { "node": ">=20.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "start": "node ui/servidor.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node --test pruebas/",
-    "test:frontera": "bash scripts/verificar-frontera.sh",
+    "test": "node --test pruebas/*.test.mjs",
+    "test:frontera": "node scripts/verificar-frontera.mjs",
     "verify:offline": "bash scripts/verify-offline.sh",
     "audit:all": "bash scripts/audit-all.sh"
   },

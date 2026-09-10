@@ -1,0 +1,14 @@
+{
+  "name": "malla",
+  "private": true,
+  "type": "module",
+  "description": "Malla P2P: bootstrap local, par de campo (sin SDK) y motor (con SDK).",
+  "dependencies": {
+    "hyperswarm": "4.17.1",
+    "hyperdht": "6.34.0",
+    "protomux": "^3.4.1",
+    "compact-encoding": "^2.15.0",
+    "hypercore-crypto": "^3.4.1",
+    "b4a": "^1.6.6"
+  }
+}
