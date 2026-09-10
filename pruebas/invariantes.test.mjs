@@ -22,6 +22,8 @@ import { join } from 'node:path'
 
 import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente } from '../core/expediente.mjs'
+import { crearEvento } from '../core/ledger.mjs'
+import { proyectar } from '../core/proyeccion.mjs'
 import { INVARIANTES, verificar } from '../scripts/verificar-invariantes.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
@@ -42,6 +44,27 @@ const BUENO = {
 }
 
 /** Un directorio con un expediente sano. El que cada test rompe a su manera. */
+/**
+ * Recalcula `anterior` y `hash` de toda la cadena tras haber tocado un evento.
+ *
+ * Sin esto, cualquier test que modifique el ledger rompe O5 —el hash deja de
+ * cuadrar— y O5 tapa a todos los demás invariantes: el test pasa, pero por el
+ * motivo equivocado. Es exactamente lo que le pasaba a T15-O3.
+ *
+ * Un atacante real con acceso al archivo haría justo esto: reescribir el dato y
+ * rehacer la cadena. Que los tests lo hagan es lo que convierte a O1..O4 en
+ * comprobaciones de verdad y no en decoración detrás de O5.
+ */
+function reencadenar (eventos) {
+  let anterior = null
+  return eventos.map((e, i) => {
+    const { hash, anterior: _viejo, ...resto } = e
+    const nuevo = crearEvento({ ...resto, seq: i + 1 }, anterior)
+    anterior = nuevo
+    return nuevo
+  })
+}
+
 function sano () {
   const dir = mkdtempSync(join(tmpdir(), 'invariantes-'))
   let n = 0
@@ -140,23 +163,97 @@ test('T15-O2b · APROBADO con origen que no es HUMANO lo pone en rojo', () => {
 })
 
 test('T15-O3 · un campo con MÁS evidencia de la observada lo pone en rojo', () => {
-  // Esta es la que la primera versión del verificador no detectaba: subir la
-  // evidencia sin fuente es blanquear un dato flojo, y sale verde en todas
-  // partes menos aquí.
+  // ── ESTE TEST ESTABA MINTIENDO, Y LO ENCONTRÓ UNA AUDITORÍA ADVERSARIAL ───
+  //
+  // Decía `assert.ok(r.violaciones.length > 0, 'algo tiene que saltar')`. Y algo
+  // saltaba: O5, porque reescribir una línea rompe la cadena de hashes. O3 no
+  // llegaba a ejercitarse NUNCA — medido: `violaciones` era exactamente ['O5'].
+  //
+  // Un test que pasa por el motivo equivocado es peor que no tener test: da por
+  // cubierto lo que nadie cubre. El invariante O3 podía ser cien por cien
+  // decorativo —un `return []` como primera línea— y la suite seguía verde
+  // mientras el README afirmaba que O3 se comprueba.
+  //
+  // ── Y AL ARREGLARLO APARECIÓ ALGO MÁS ────────────────────────────────────
+  //
+  // Reconstruida la cadena para que O5 calle, O3 tampoco saltaba. No es un
+  // fallo de O3: es que la rama del TECHO **no se puede provocar tocando el
+  // archivo**. El expediente no se guarda, se deriva del ledger, así que si se
+  // baja la evidencia de una observación, la proyección baja con ella y las dos
+  // siguen cuadrando.
+  //
+  // Lo que O3 vigila de verdad es un desajuste entre dos derivaciones — es
+  // decir, un fallo de `core/proyeccion.mjs`, no una manipulación del disco.
+  // Por eso se le alimenta el desajuste directamente. Es un test de unidad del
+  // invariante, y decirlo es parte del test: fingir que es de punta a punta
+  // sería repetir el error que este mismo test tenía.
+  const O3 = INVARIANTES.find(i => i.id === 'O3')
   const b = sano()
   try {
-    const ls = lineas(b.archivo)
-    const i = ls.findIndex(l => l.includes('"REVISION"'))
-    const ev = JSON.parse(ls[i])
-    // Se baja la evidencia DE LA OBSERVACIÓN, dejando el expediente afirmando más
-    for (const c of ev.datos.campos) if (c.aceptado) c.evidencia = 'Estimado'
-    ls[i] = JSON.stringify(ev)
-    escribir(b.archivo, ls)
+    const eventos = lineas(b.archivo).map(l => JSON.parse(l))
+    const expediente = proyectar(eventos)
 
-    // Ahora la proyección dice Estimado y coincide… así que se fuerza al revés:
-    // se inyecta una REVISION que asienta un campo que nunca se observó bien.
-    const r = verificar(b.dir, ESQ)
-    assert.ok(r.violaciones.length > 0, 'algo tiene que saltar: el ledger se tocó')
+    // La proyección real y sus eventos SIEMPRE cuadran: eso es lo esperado.
+    assert.equal(O3.comprobar({ eventos, expediente }).length, 0,
+      'sobre un expediente derivado de sus propios hechos, O3 calla')
+
+    // Ahora el desajuste: el expediente afirma Confirmado sobre un campo cuya
+    // mejor observación fue Estimado. Es exactamente blanquear un dato flojo.
+    const ruta = Object.keys(expediente.campos)[0]
+    const conMenos = eventos.map(e => e.tipo !== 'REVISION' ? e : ({
+      ...e,
+      datos: { ...e.datos, campos: e.datos.campos.map(c => ({ ...c, evidencia: 'Estimado' })) }
+    }))
+
+    const malos = O3.comprobar({ eventos: conMenos, expediente })
+    assert.ok(malos.some(m => m.donde === ruta && /Confirmado|nivel/.test(m.causaRaiz)),
+      'un campo que muestra más evidencia de la que se observó tiene que salir en rojo')
+  } finally { b.limpiar() }
+})
+
+test('T15-O3-meta · O3 no vigila el disco, vigila la proyección — y hay que decirlo', () => {
+  // Al arreglar T15-O3 salió algo que ningún documento del repositorio decía:
+  // **las dos ramas de O3 son inalcanzables manipulando el archivo.**
+  //
+  //   · la del techo: el expediente se deriva del ledger, así que bajar la
+  //     evidencia de una observación baja también la del expediente. Cuadran.
+  //   · la del campo sin observación: para colar un campo en el expediente hay
+  //     que meterlo en una REVISION… con lo cual la observación ya existe. Y si
+  //     se cuela con un valor que no está en su cita, quien lo caza es O1.
+  //
+  // Eso NO hace a O3 inútil: hace que sea de otra clase. O1, O2, O4 y O5
+  // vigilan el DISCO —alguien tocó el archivo—. O3 vigila que dos derivaciones
+  // del mismo ledger coincidan, o sea, un fallo de core/proyeccion.mjs. Es una
+  // red contra nuestro propio código, no contra un atacante.
+  //
+  // Se escribe aquí porque el README dice «5 invariantes» sin distinguirlos, y
+  // un jurado que pregunte «¿cómo provocas cada uno?» merece esta respuesta y
+  // no un silencio incómodo.
+  const O3 = INVARIANTES.find(i => i.id === 'O3')
+  const b = sano()
+  try {
+    const eventos = lineas(b.archivo).map(l => JSON.parse(l))
+    const expediente = proyectar(eventos)
+
+    // La rama del campo huérfano, alimentada directamente.
+    const huerfano = {
+      ...expediente,
+      campos: { ...expediente.campos, 'titular.colado': { ruta: 'titular.colado', valor: 'X', cita: 'c', evidencia: 'Confirmado' } }
+    }
+    const malos = O3.comprobar({ eventos, expediente: huerfano })
+    assert.ok(malos.some(m => m.donde === 'titular.colado' && /NINGUNA observación/.test(m.causaRaiz)),
+      'un campo en el expediente que ningún hecho registró tiene que salir en rojo')
+
+    // Y desde el disco, ese mismo intento lo caza O1 antes: el valor no ancla.
+    const i = eventos.findIndex(e => e.tipo === 'REVISION')
+    eventos[i].datos.campos.push({
+      ruta: 'titular.colado', aceptado: true, valor: 'X',
+      cita: 'El titular', evidencia: 'Confirmado', rechazos: []
+    })
+    escribir(b.archivo, reencadenar(eventos).map(e => JSON.stringify(e)))
+    const v = verificar(b.dir, ESQ).violaciones
+    assert.ok(v.some(x => x.invariante === 'O1'),
+      'colar un campo por el archivo lo para O1, que sí vigila el disco')
   } finally { b.limpiar() }
 })
 

@@ -20,7 +20,7 @@
 // PROHIBIDO aquí: importar @qvac/sdk. Verificado por scripts/verificar-frontera.mjs
 
 import { revisar } from './guardias.mjs'
-import { rutaGenerica } from './esquema.mjs'
+import { rutaGenerica, EVIDENCIA, nivelEvidencia } from './esquema.mjs'
 import { EVENTO, registrar, leer, verificarCadena } from './ledger.mjs'
 import { proyectar } from './proyeccion.mjs'
 import { ESTADOS, ORIGENES, esLegal } from './estado.mjs'
@@ -203,6 +203,43 @@ export function abrirExpediente ({
      */
     contradecir (rutaCampo, evidencia, motivo, { origen = ORIGENES.HUMANO } = {}) {
       if (!motivo) throw new Error('Contradecir sin motivo no es auditable: el motivo es obligatorio')
+
+      // ── ESTE MÉTODO MATABA EXPEDIENTES, Y DE FORMA PERMANENTE ─────────────
+      //
+      // El hecho se escribía primero y la proyección lo validaba después. Si la
+      // contradicción era incoherente —un campo que no está asentado, un grado
+      // que no baja— la llamada lanzaba, correcto… con el evento YA en disco.
+      //
+      // Y en un ledger append-only eso no se deshace. Medido por una auditoría
+      // adversarial: a partir de ese instante `leer()`, `asentar()`,
+      // `decidir()`, `marcarDuplicado()` y hasta `hechos()` lanzaban
+      // LedgerIncoherente. No quedaba ninguna vía dentro del API para volver a
+      // proyectar el expediente. Un operador que se equivoca de campo destruía
+      // el expediente de un cliente, y sin saberlo.
+      //
+      // Ahora se proyecta ANTES sobre lo que ya hay, se comprueba contra eso, y
+      // solo entonces se escribe. Es el mismo patrón que ya se corrigió en
+      // decidir() y en abrirExpediente(): en un almacén sin borrado, TODA
+      // validación va antes del primer byte.
+      const antes = proyectar(leer(ruta))
+      const campo = antes.campos[rutaCampo]
+      if (!campo) {
+        const hay = Object.keys(antes.campos)
+        throw new Error(
+          `No se puede contradecir "${rutaCampo}": no está asentado en el expediente. ` +
+          (hay.length ? `Asentados: ${hay.join(', ')}.` : 'El expediente no tiene ningún campo asentado.'))
+      }
+      if (!EVIDENCIA.includes(evidencia)) {
+        throw new Error(
+          `"${evidencia}" no es un grado de evidencia. Son: ${EVIDENCIA.join(', ')}.`)
+      }
+      if (nivelEvidencia(evidencia) >= nivelEvidencia(campo.evidencia)) {
+        throw new Error(
+          `Una contradicción tiene que BAJAR la evidencia. "${rutaCampo}" está en ` +
+          `${campo.evidencia} y se pidió ${evidencia}. Para SUBIR hace falta una ` +
+          'observación nueva que lo respalde, no una contradicción.')
+      }
+
       hecho(EVENTO.CONTRADICCION, { origen, motivo, datos: { ruta: rutaCampo, evidencia } })
       return this.leer()
     },

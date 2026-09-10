@@ -408,8 +408,31 @@ function resumir (campos, esquema) {
     }
   }
   const criticos = esquema?.camposCriticos ?? []
-  const faltanCriticos = criticos.filter(cr =>
-    !campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))
+
+  // ── UN CRÍTICO SE EXIGE POR CADA ELEMENTO, NO UNA VEZ POR EL ARRAY ────────
+  //
+  // Esto era `!campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado)`:
+  // bastaba que UN elemento del array tuviera el campo crítico anclado para que
+  // el `some` diera verdadero y el expediente entero quedara por completo.
+  //
+  // Medido por una auditoría adversarial: un expediente de tres documentos donde
+  // el primero ancla su fecha y los otros dos la tienen en DESCONOCIDO —uno por
+  // no anclar, otro vencido por G7— salía con `faltanCriticos: []`,
+  // `completitud: 1` y listo para que una persona lo firmara. Dos tercios del
+  // expediente sin su campo crítico, y ninguna alerta.
+  //
+  // En admisión eso es exactamente el hueco que el Acuerdo 1-2026 persigue: el
+  // expediente parece completo y no lo está, así que nadie repregunta.
+  //
+  // Ahora cada elemento responde por sí mismo: `documentos[1].fecha_emision`
+  // falta aunque `documentos[0].fecha_emision` esté. Los campos que no son de
+  // array se comportan igual que antes.
+  const faltanCriticos = []
+  for (const cr of criticos) {
+    const delMismoTipo = campos.filter(c => rutaGenerica(c.ruta) === cr)
+    if (!delMismoTipo.length) { faltanCriticos.push(cr); continue }
+    for (const c of delMismoTipo) if (!c.aceptado) faltanCriticos.push(c.ruta)
+  }
 
   return Object.freeze({
     total: campos.length,

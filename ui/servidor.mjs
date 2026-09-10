@@ -97,6 +97,12 @@ const servidor = createServer(async (req, res) => {
       })
     }
 
+    // ── TODA ESCRITURA PASA POR AQUÍ ANTES QUE POR NINGÚN SITIO ─────────────
+    if (req.method === 'POST') {
+      const no = escrituraRechazada(req, url)
+      if (no) return enviar(no.codigo, { ok: false, error: no.error })
+    }
+
     // ⭐ Resolver un conflicto entre fuentes: el humano en el bucle, desde el
     // navegador. Las tres reglas —valor de la disputa, oficial, motivo— viven
     // en core/expediente.mjs y NO se repiten aquí: si se validara también en el
@@ -169,6 +175,73 @@ function resumir (e) {
     completitud: q.completitud, puedeCerrar: q.puedeCerrar,
     porEvidencia: e.resumen.porEvidencia
   }
+}
+
+/**
+ * ⭐ ¿Se rechaza esta escritura? Devuelve el motivo, o null si puede pasar.
+ *
+ * ── EL SOFTWARE SÍ APROBABA SOLO ──────────────────────────────────────────
+ *
+ * Encontrado por una auditoría adversarial, y es el hallazgo que más duele
+ * porque contradice la frase con la que se presenta el proyecto entero.
+ *
+ * Bastaba esto, desde una pestaña cualquiera que el oficial tuviera abierta:
+ *
+ *   curl -X POST http://127.0.0.1:7301/api/decidir/EXP-9 \
+ *        -H 'Content-Type: text/plain;charset=UTF-8' \
+ *        -H 'Origin: https://sitio-cualquiera.example' \
+ *        --data '{"que":"aprobar","motivo":"aprobado por el oficial"}'
+ *
+ *   → {"ok":true,"estado":"APROBADO"}
+ *
+ * Y el ledger append-only quedaba con un hecho `origen: HUMANO` que ninguna
+ * persona escribió. Irreversible, porque no hay borrado.
+ *
+ * `text/plain` no es un descuido del atacante: es la forma conocida de que el
+ * navegador NO pida permiso al servidor antes de enviar (una petición simple no
+ * dispara la comprobación previa de CORS). Por eso exigir JSON no es cosmética:
+ * es lo que obliga al navegador a preguntar primero, y a que este servidor
+ * pueda decir que no.
+ *
+ * Peor todavía: con un identificador inexistente, el mismo POST CREABA un
+ * expediente cuyo primer y único hecho era una aprobación humana.
+ *
+ * ── LO QUE ESTO **NO** ES ─────────────────────────────────────────────────
+ *
+ * No es autenticación. Aquí no la hay, y está declarado en el README como
+ * límite conocido: `--oficial` es un texto que alguien escribe, no una
+ * identidad verificada contra un directorio. En una instalación de verdad, esa
+ * identidad la pone el sistema del banco.
+ *
+ * Lo que sí impide es que una página web ajena escriba en el expediente sin
+ * que nadie de la sucursal haya tocado nada, que era lo que pasaba.
+ */
+function escrituraRechazada (req, url) {
+  // 1 · Solo JSON. Cierra la vía de la petición «simple» sin comprobación previa.
+  const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim()
+  if (tipo !== 'application/json') {
+    return { codigo: 415, error: 'las escrituras exigen content-type: application/json' }
+  }
+
+  // 2 · El origen tiene que ser este mismo servidor. Si no hay cabecera es que
+  //     no viene de un navegador (curl, un script): eso se permite, porque es
+  //     exactamente cómo el juez reproduce la demostración desde la terminal.
+  const origen = req.headers.origin
+  if (origen && origen !== `http://127.0.0.1:${PUERTO}` && origen !== `http://localhost:${PUERTO}`) {
+    return { codigo: 403, error: `una página de ${origen} no escribe en un expediente de esta sucursal` }
+  }
+  // Y si el navegador dice de dónde viene, se le cree cuando dice que es de fuera.
+  if (String(req.headers['sec-fetch-site'] ?? 'same-origin') !== 'same-origin') {
+    return { codigo: 403, error: 'petición de otro sitio: no se escribe en el expediente' }
+  }
+
+  // 3 · Un POST NO crea expedientes. Escribir sobre lo que no existe creaba un
+  //     ledger cuyo primer hecho era una firma humana que nadie firmó.
+  const id = decodeURIComponent(url.pathname.split('/').pop())
+  if (!existsSync(join(DATOS, `${id}.jsonl`))) {
+    return { codigo: 404, error: `no existe el expediente ${id}: una decisión no lo crea` }
+  }
+  return null
 }
 
 function leerCuerpo (req) {
