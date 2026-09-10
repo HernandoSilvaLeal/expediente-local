@@ -186,15 +186,25 @@ puerta('la definición del problema sigue describiendo el sistema', () => {
   } catch { malos.push('no se pudo leer el banco de casos') }
 
   // Y la proporción determinista, que también se afirma con número.
+  //
+  // Se cuenta AQUÍ y no se le pregunta a `metricas.mjs`: ese script corre los
+  // 370 tests por dentro para sacar sus números, así que llamarlo desde una
+  // puerta multiplicaba por cien lo que tarda la verificación entera —de un
+  // segundo a más de dos minutos—. Una puerta que se corre veinte veces al día
+  // no puede pagar el coste de una suite completa para leer un porcentaje.
   const pct = /(\d+[,.]\d+)\s*%\s*del sistema es c[oó]digo/i.exec(texto)?.[1]?.replace(',', '.')
   if (pct) {
-    try {
-      const m = JSON.parse(execFileSync('node', ['scripts/metricas.mjs', '--json'],
-        { cwd: RAIZ, encoding: 'utf8', timeout: 30000 }))
-      if (Math.abs(Number(pct) - m.proporcion.porcentajeDeterminista) > 0.1) {
-        malos.push(`dice ${pct} % determinista y la medida es ${m.proporcion.porcentajeDeterminista} %`)
-      }
-    } catch { /* si metricas falla, ya lo dice otra puerta */ }
+    const modulos = []
+    for (const dir of ['core', 'ia', 'malla', 'ui']) {
+      const d = join(RAIZ, dir)
+      if (!existsSync(d)) continue
+      for (const f of readdirSync(d)) if (f.endsWith('.mjs')) modulos.push(join(d, f))
+    }
+    const conModelo = modulos.filter(m => /@qvac\/sdk/.test(readFileSync(m, 'utf8'))).length
+    const medido = modulos.length ? +(100 * (modulos.length - conModelo) / modulos.length).toFixed(1) : 0
+    if (Math.abs(Number(pct) - medido) > 0.1) {
+      malos.push(`dice ${pct} % determinista y la cuenta da ${medido} %`)
+    }
   }
 
   return { ok: malos.length === 0, detalle: malos.join(' · ') }
