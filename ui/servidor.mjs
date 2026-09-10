@@ -57,6 +57,23 @@ const dominio = await cargarDominio(esquema, { hoy })
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' }
 
+/**
+ * Quién está mirando ahora mismo.
+ *
+ * Vive en memoria a propósito: si el servidor se reinicia, los navegadores
+ * reconectan solos —para eso está el `retry`— y no hay nada que recuperar.
+ * Un registro persistente de conexiones sería estado que se puede desfasar.
+ */
+const oyentes = new Set()
+
+/** Avisa a todos los dispositivos de que algo cambió. NO manda el qué. */
+function avisar (que) {
+  for (const res of oyentes) {
+    try { res.write(`event: cambio\ndata: ${JSON.stringify({ que })}\n\n`) }
+    catch { oyentes.delete(res) }
+  }
+}
+
 const servidor = createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PUERTO}`)
   const enviar = (codigo, cuerpo, tipo = 'application/json; charset=utf-8') => {
@@ -116,6 +133,35 @@ const servidor = createServer(async (req, res) => {
       if (no) return enviar(no.codigo, { ok: false, error: no.error })
     }
 
+    // ⭐ LOS DISPOSITIVOS SE ENTERAN — `text/event-stream`, sin dependencias
+    //
+    // Marta resuelve un conflicto en la tableta y el celular de Ricardo mostraba
+    // datos viejos hasta que él recargara a mano. Con dos personas actuando en
+    // la misma escena, eso se ve y rompe la ilusión de sistema vivo.
+    //
+    // Se elige SSE y no WebSocket por tres razones, y las tres importan aquí:
+    // `node:http` lo soporta sin instalar nada; el navegador reconecta solo; y
+    // encaja con el CSP que ya servimos (`default-src 'self'`).
+    //
+    // No lleva datos: solo avisa de que algo cambió. Quien reciba el aviso pide
+    // lo que necesite por la API de siempre. Un canal que empuja estado es un
+    // segundo sitio donde el estado puede quedar desfasado, y ya tenemos uno.
+    if (url.pathname === '/api/eventos') {
+      res.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-store',
+        connection: 'keep-alive'
+      })
+      res.write('retry: 3000\n\n')
+      oyentes.add(res)
+      // Un latido cada 25 s: sin él, un proxy o el propio sistema operativo
+      // cierran la conexión por inactividad y el aviso deja de llegar sin que
+      // nadie se entere — que es peor que no tener canal.
+      const latido = setInterval(() => { try { res.write(': latido\n\n') } catch { /* cerrada */ } }, 25000)
+      req.on('close', () => { clearInterval(latido); oyentes.delete(res) })
+      return
+    }
+
     // ⭐ CAPTURAR — lo que le faltaba a la ventanilla para existir
     //
     // Hasta aquí la interfaz solo sabía LEER y decidir sobre lo ya capturado.
@@ -149,6 +195,7 @@ const servidor = createServer(async (req, res) => {
         // asentar después, que es como funciona una ventanilla de verdad.
         const revision = cuerpo?.extraccion ? exp.asentar(cuerpo.extraccion).revision : null
         const e = exp.leer()
+        avisar('capturado')
         return enviar(200, {
           ok: true, id, estado: e.estado,
           anclados: revision ? revision.resumen.aceptados : 0,
@@ -174,6 +221,7 @@ const servidor = createServer(async (req, res) => {
         const e = exp.resolver(cuerpo.campo, {
           valor: cuerpo.valor, oficial: cuerpo.oficial ?? null, motivo: cuerpo.motivo ?? null
         })
+        avisar('resuelto')
         return enviar(200, { ok: true, conflictos: e.conflictos.length })
       } catch (err) {
         return enviar(409, { ok: false, error: err.message })
@@ -193,6 +241,7 @@ const servidor = createServer(async (req, res) => {
         const e = exp.decidir(cuerpo.que, {
           motivo: cuerpo.motivo ?? null, oficial: cuerpo.oficial ?? null
         })
+        avisar('decidido')
         return enviar(200, { ok: true, estado: e.estado })
       } catch (err) {
         // 409, no 500: no es que el servidor falle, es que la operación no es

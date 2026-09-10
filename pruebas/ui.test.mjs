@@ -129,9 +129,19 @@ test('UI-02 · ⭐ cada función del script está UNA sola vez', async () => {
   const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
 
   for (const decl of ['function resaltar', 'function normalizar', 'function cablearConflictos',
-                      'async function abrirExpediente', 'async function cargarLista', 'const QUIEN']) {
+                      'function cablearFirma', 'function pintarCaptura', 'function seguirCambios',
+                      'function puedeFirmar', 'function reparto',
+                      'async function abrirExpediente', 'async function cargarLista',
+                      'const QUIEN', 'let refresco', 'let ESQUEMA']) {
     assert.equal(js.split(decl).length - 1, 1, `"${decl}" tiene que aparecer exactamente una vez`)
   }
+
+  // Y la llamada de arranque, una sola: dos `cargarLista()` sueltos al final
+  // significan que un replace se aplicó donde no debía. Ya pasó DOS veces en
+  // este archivo —la segunda insertó cinco copias del mismo bloque— y las dos
+  // veces el script seguía parseando, que es lo que lo hace difícil de ver.
+  assert.equal((js.match(/^cargarLista\(\)$/gm) ?? []).length, 1,
+    'una sola llamada de arranque')
 })
 
 test('UI-03 · el script del navegador es sintácticamente válido', async () => {
@@ -467,4 +477,79 @@ test('UI-30 · la pantalla usa lo que el servidor YA calcula', async () => {
   for (const dato of ['puedeCerrar', 'porEvidencia', 'criticos']) {
     assert.match(html, new RegExp(dato), `${dato} se devuelve y no se pinta`)
   }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-8 · QUE LOS DISPOSITIVOS SE ENTEREN
+//
+//  Marta resuelve en la tableta y el celular de Ricardo mostraba datos viejos
+//  hasta que él recargara a mano. Con dos personas actuando, eso se ve.
+//
+//  Esto se prueba de VERDAD —abriendo el canal y provocando un cambio— y no
+//  comprobando que la palabra «event-stream» esté en un archivo. Un grep sobre
+//  el código dice que alguien escribió algo, no que funcione.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-31 · ⭐ un dispositivo se entera de lo que hizo otro', async () => {
+  // El expediente se prepara ANTES de abrir el canal: capturar también avisa, y
+  // si no, lo primero que llega es el aviso de la preparación y no el del acto
+  // que se está probando. Un test que se conforma con «llegó algo» no prueba
+  // que llegue lo correcto.
+  const id = await expedienteConConflicto('EXP-AVISO')
+
+  const canal = await fetch(`${BASE}/api/eventos`)
+  assert.equal(canal.headers.get('content-type'), 'text/event-stream')
+
+  const lector = canal.body.getReader()
+  const dec = new TextDecoder()
+  let recibido = ''
+
+  // Se lee en paralelo mientras otro «dispositivo» actúa.
+  const escuchando = (async () => {
+    const limite = Date.now() + 5000
+    while (Date.now() < limite) {
+      const { value, done } = await lector.read()
+      if (done) break
+      recibido += dec.decode(value, { stream: true })
+      if (recibido.includes('event: cambio')) return
+    }
+  })()
+
+  await new Promise(r => setTimeout(r, 200))
+  await post(`/api/resolver/${id}`, {
+    campo: 'titular.nombre', valor: 'María Gómez Batista', rol: 'oficial',
+    oficial: 'Marta Him', motivo: 'La cédula coincide con la carta laboral.'
+  })
+
+  await escuchando
+  await lector.cancel()
+
+  assert.match(recibido, /retry:/, 'el navegador tiene que saber cada cuánto reintentar')
+  assert.match(recibido, /event: cambio/, 'el aviso llegó al otro dispositivo')
+  assert.match(recibido, /"que":"resuelto"/)
+})
+
+test('UI-32 · el aviso NO lleva los datos, solo dice que algo cambió', async () => {
+  // Un canal que empuja estado es un segundo sitio donde el estado puede quedar
+  // desfasado, y ya tenemos uno. Quien recibe el aviso pide lo que necesite.
+  const canal = await fetch(`${BASE}/api/eventos`)
+  const lector = canal.body.getReader()
+  const dec = new TextDecoder()
+
+  await new Promise(r => setTimeout(r, 100))
+  await post('/api/capturar/EXP-AVISO-2', { rol: 'oficial', texto: 'El titular es Ana Ruiz.' })
+
+  let recibido = ''
+  const limite = Date.now() + 4000
+  while (Date.now() < limite && !recibido.includes('event: cambio')) {
+    const { value, done } = await lector.read()
+    if (done) break
+    recibido += dec.decode(value, { stream: true })
+  }
+  await lector.cancel()
+
+  const datos = /data: (.+)/.exec(recibido)?.[1]
+  assert.ok(datos, 'llegó un aviso')
+  const payload = JSON.parse(datos)
+  assert.deepEqual(Object.keys(payload), ['que'], 'solo dice QUÉ pasó, no el expediente entero')
 })

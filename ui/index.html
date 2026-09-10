@@ -62,9 +62,40 @@ header .dominio{
 }
 
 main{display:grid; grid-template-columns:300px 1fr; gap:0; min-height:calc(100vh - 61px)}
-@media (max-width:900px){main{grid-template-columns:1fr}}
+@media (max-width:900px){
+  main{grid-template-columns:1fr}
+  /* El borde lateral flotaba a la derecha cuando el layout ya era vertical. */
+  aside{border-right:0; border-bottom:1px solid var(--borde)}
+  /* El alto asumía una cabecera de 61px exactos, y en móvil se va a tres filas. */
+  main{min-height:auto}
+}
 
-aside{border-right:1px solid var(--borde); padding:16px; overflow:auto}
+/* ── EL TELÉFONO DE VERDAD ──────────────────────────────────────────────────
+   El dispositivo del gerente es el más simple de todos —leer un resumen y
+   firmar— y era el que peor se veía. */
+@media (max-width:560px){
+  body{font-size:14px}
+  header{padding:12px 14px; gap:8px}
+  header .quien{width:100%}
+  header .quien input{flex:1; width:auto; min-width:0}
+  header .dominio{margin-left:0}
+  section{padding:14px}
+  aside{padding:14px}
+  /* Media pantalla de teléfono en un panel que solo se consulta es demasiado. */
+  .hechos{max-height:150px}
+  pre{max-height:200px}
+  .fuente{max-height:200px}
+  /* Los dos botones de firma, a lo ancho: se pulsan con el pulgar. */
+  .botonera{flex-direction:column}
+  .botonera .btn{width:100%}
+}
+
+/* ── `min-width:0` NO ES COSMÉTICO: ARREGLA EL DESBORDAMIENTO ─────────────
+   Un ítem de grid tiene `min-width:auto` por defecto, así que un contenido que
+   no rompe línea —`td.ruta` es `white-space:nowrap` y las rutas son largas—
+   estira el CONTENEDOR en vez de scrollear dentro. Resultado: scroll
+   horizontal de la página entera en un teléfono, que es donde se mira. */
+aside{border-right:1px solid var(--borde); padding:16px; overflow:auto; min-width:0}
 aside h2,section h2{
   font-size:11px; text-transform:uppercase; letter-spacing:1.2px;
   color:var(--apagado); margin:0 0 10px; font-weight:600;
@@ -79,11 +110,14 @@ aside h2,section h2{
 .exp .id{font-weight:600; font-size:13px}
 .exp .meta{color:var(--tenue); font-size:12px; margin-top:3px}
 
-section{padding:20px 24px; overflow:auto}
+section{padding:20px 24px; overflow:auto; min-width:0}
 
 .tarjeta{background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:16px; margin-bottom:16px}
 .tarjeta.hueco{border-color:#4A2F30; background:#1B1618}
 
+/* Cada tabla scrollea DENTRO de su tarjeta. Sin esto, la más ancha decide el
+   ancho de todo lo demás. */
+.tarjeta table{display:block; overflow-x:auto; max-width:100%}
 table{width:100%; border-collapse:collapse; font-size:14px}
 th{text-align:left; color:var(--apagado); font-weight:600; font-size:11px;
    text-transform:uppercase; letter-spacing:.8px; padding:0 8px 8px 0}
@@ -141,15 +175,18 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
    se lee. Por eso es lo único que lleva controles de formulario. */
 .conflicto{border-top:1px solid var(--linea); padding-top:12px; margin-top:12px}
 .conflicto:first-of-type{border-top:0; padding-top:0; margin-top:0}
-.opcion{display:flex; gap:9px; align-items:flex-start; padding:7px 0; cursor:pointer}
+.opcion{display:flex; gap:9px; align-items:flex-start; padding:7px 0; cursor:pointer; min-height:44px}
 .opcion input{margin-top:4px; accent-color:var(--mint)}
-.campo{display:block; width:100%; margin-top:8px; padding:8px 10px;
+.campo{display:block; width:100%; margin-top:8px; padding:11px 10px; min-height:44px;
        background:#0B1018; color:var(--texto); font:inherit; font-size:13px;
        border:1px solid var(--borde); border-radius:6px}
 .campo:focus{outline:0; border-color:var(--mint)}
 textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
-.btn{margin-top:10px; padding:8px 14px; font:inherit; font-size:13px; font-weight:600;
-     color:#06251F; background:var(--mint); border:0; border-radius:6px; cursor:pointer}
+/* 44 px es el mínimo táctil recomendado. Los botones estaban en 33, y el
+   dispositivo donde peor se veían era justo el del gerente — el más simple. */
+.btn{margin-top:10px; padding:11px 16px; min-height:44px; font:inherit; font-size:13px;
+     font-weight:600; color:#06251F; background:var(--mint); border:0; border-radius:6px;
+     cursor:pointer}
 .btn:disabled{opacity:.5; cursor:default}
 .error{color:var(--coral); font-size:12.5px; margin-top:8px; line-height:1.45}
 .botonera{display:flex; gap:9px; margin-top:10px; flex-wrap:wrap}
@@ -706,7 +743,48 @@ $('#quien').addEventListener('input', e => {
   for (const c of document.querySelectorAll('[data-of]')) if (!c.dataset.tocado) c.value = e.target.value
 })
 
+// ── QUE LOS DISPOSITIVOS SE ENTEREN ────────────────────────────────────────
+//
+// Marta resuelve en la tableta y esta pantalla se actualiza sola. El aviso NO
+// trae datos: solo dice que algo cambió, y entonces se pide lo que haga falta
+// por la API de siempre. Un canal que empuja estado es un segundo sitio donde
+// el estado puede quedar desfasado.
+//
+// EL RESPALDO VA CABLEADO DESDE EL PRIMER MOMENTO, no como idea de reserva: si
+// el canal no conecta en cinco segundos —un proxy raro, un navegador viejo, la
+// red de una sala de conferencias— se cae a preguntar cada tres segundos y la
+// pantalla sigue viva. Un plan B que solo existe en un comentario no existe.
+let refresco = null
+
+function seguirCambios () {
+  const preguntar = async () => { await cargarLista() }
+
+  const caerARepetir = (porque) => {
+    if (refresco) return
+    console.info('canal de cambios:', porque, '— se pregunta cada 3 s')
+    refresco = setInterval(preguntar, 3000)
+  }
+
+  if (typeof EventSource !== 'function') return caerARepetir('este navegador no lo soporta')
+
+  let conecto = false
+  const canal = new EventSource('/api/eventos')
+  canal.addEventListener('open', () => {
+    conecto = true
+    // Si el canal vuelve, se deja de preguntar: mantener los dos es pedir el
+    // doble por el mismo dato.
+    if (refresco) { clearInterval(refresco); refresco = null }
+  })
+  canal.addEventListener('cambio', preguntar)
+  canal.addEventListener('error', () => { if (!conecto) caerARepetir('no conectó') })
+
+  // El navegador reintenta solo, pero puede tardar. Cinco segundos sin conectar
+  // y se enciende el respaldo; si el canal aparece después, se apaga.
+  setTimeout(() => { if (!conecto) caerARepetir('cinco segundos sin conectar') }, 5000)
+}
+
 cargarLista()
+seguirCambios()
 </script>
 </body>
 </html>
