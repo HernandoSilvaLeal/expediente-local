@@ -99,7 +99,7 @@ export function hashDe (evento) {
  * @param {object|null} anterior  el último evento del ledger, o null si es el primero
  */
 export function crearEvento (campos, anterior = null) {
-  const { tipo, expediente, origen, motivo = null, datos = {}, ts } = campos
+  const { tipo, expediente, origen, motivo = null, oficial = null, datos = {}, ts } = campos
 
   if (!Object.hasOwn(EVENTO, tipo)) {
     throw new Error(`Tipo de evento desconocido: "${tipo}". Debe ser uno de ${Object.keys(EVENTO).join(', ')}`)
@@ -114,6 +114,13 @@ export function crearEvento (campos, anterior = null) {
     expediente,
     origen: origen ?? 'REGLA',
     motivo,
+    // ── QUIÉN. Campo de primera clase del evento, y dentro del hash ──────────
+    // Va aquí y no dentro de `datos` a propósito: «quién hizo esto» es la
+    // primera pregunta de cualquier auditoría, y un campo enterrado en un
+    // objeto libre no se puede exigir. Al estar en `base` entra en el hash,
+    // así que cambiar el nombre del firmante rompe la cadena.
+    // Es null en los eventos que no los firma nadie: los que emite una regla.
+    oficial,
     datos,
     anterior: anterior ? anterior.hash : GENESIS
   }

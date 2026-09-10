@@ -20,7 +20,7 @@
 //   node cli.mjs capturar  --texto "..." [--modelo <ruta>] [--proveedor <clave>]
 //   node cli.mjs revisar   --texto "..." --extraccion salida-del-modelo.json
 //   node cli.mjs ver | csv | verificar | hechos
-//   node cli.mjs aprobar --motivo "..."  |  rechazar --motivo "..."
+//   node cli.mjs aprobar --oficial "..." --texto "..."  |  rechazar --oficial "..."
 //
 // Opciones comunes:  --expediente EXP-001  --ledger datos/EXP-001.jsonl
 //                    --esquema instancias/banca/esquema.json
@@ -44,6 +44,7 @@ const { values: op, positionals } = parseArgs({
     ledger:     { type: 'string' },
     modelo:     { type: 'string' },
     proveedor:  { type: 'string' },   // clave pública del par que tiene la GPU
+    oficial:    { type: 'string' },   // quién firma. Sin esto no se aprueba ni se rechaza
     salida:     { type: 'string' },
     hoy:        { type: 'string' },   // fija el reloj: ver abajo
     json:       { type: 'boolean', default: false },
@@ -234,7 +235,7 @@ function hechos () {
 }
 
 function decidir (que) {
-  const e = exp.decidir(que, { motivo: op.texto ?? null })
+  const e = exp.decidir(que, { motivo: op.texto ?? null, oficial: op.oficial ?? null })
   console.log(`\n  ${V}✓${N} ${que} · el expediente queda en ${B}${e.estado}${N}\n`)
 }
 
@@ -263,6 +264,14 @@ function pintar (e, revision) {
     for (const [ruta, h] of huecos) {
       console.log(`     ${R}○${N} ${ruta.padEnd(26)} ${G}${h.guardias.join(', ')} · ${h.motivos.join(', ')}${N}`)
     }
+  }
+
+  // ── QUIÉN FIRMÓ. Es la primera pregunta de una auditoría ────────────────
+  const firma = (e.decisiones ?? []).at(-1)
+  if (firma) {
+    console.log(`\n  ${B}${firma.que === 'aprobar' ? V : R}✍ ${firma.que.toUpperCase()}${N}` +
+                `  ${C}${firma.oficial ?? '—'}${N}`)
+    console.log(`     ${G}${firma.ts}${firma.motivo ? `  ·  «${firma.motivo}»` : ''}${N}`)
   }
 
   const conflictos = e.conflictos ?? []
@@ -310,10 +319,10 @@ function ayuda () {
      ${C}csv${N}         [--salida dataset.csv]          ${G}con columna de auditoría${N}
      ${C}verificar${N}                                   ${G}¿alguien tocó el archivo a mano?${N}
      ${C}hechos${N}                                      ${G}el ledger, hecho a hecho${N}
-     ${C}aprobar${N}  --texto "motivo"                   ${G}solo una persona puede${N}
-     ${C}rechazar${N} --texto "motivo"                   ${G}el motivo es obligatorio${N}
+     ${C}aprobar${N}  --oficial "quién" --texto "motivo"  ${G}solo una persona puede${N}
+     ${C}rechazar${N} --oficial "quién" --texto "motivo"  ${G}quién y por qué: los dos${N}
 
-  ${B}COMUNES${N}  --expediente EXP-001 · --ledger datos/x.jsonl
+  ${B}COMUNES${N}  --expediente EXP-001 · --ledger datos/x.jsonl · --hoy 2026-09-10
             --esquema instancias/banca/esquema.json · --json
             ${C}--hoy AAAA-MM-DD${N}  ${G}fija el día, para que una demo no caduque sola${N}
 

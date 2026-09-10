@@ -108,7 +108,9 @@ const servidor = createServer(async (req, res) => {
         contextoDominio: dominio.contexto
       })
       try {
-        const e = exp.decidir(cuerpo.que, { motivo: cuerpo.motivo ?? null })
+        const e = exp.decidir(cuerpo.que, {
+          motivo: cuerpo.motivo ?? null, oficial: cuerpo.oficial ?? null
+        })
         return enviar(200, { ok: true, estado: e.estado })
       } catch (err) {
         // 409, no 500: no es que el servidor falle, es que la operación no es

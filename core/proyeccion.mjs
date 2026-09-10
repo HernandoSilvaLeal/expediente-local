@@ -161,7 +161,12 @@ function aplicar (exp, e) {
     }
 
     case EVENTO.DECISION_HUMANA: {
-      exp.decisiones.push({ seq: e.seq, ts: e.ts, que: e.datos.que ?? null, motivo: e.motivo })
+      // `oficial` va en la decisión porque «quién firmó» es la primera pregunta
+      // de cualquier auditoría, y hasta ahora el ledger solo decía `origen: HUMANO`.
+      exp.decisiones.push({
+        seq: e.seq, ts: e.ts, que: e.datos.que ?? null,
+        oficial: e.oficial ?? null, motivo: e.motivo
+      })
       break
     }
 

@@ -87,7 +87,7 @@ try {
   ok(`estado ${e.estado} — no llega a COMPLETO porque falta titular.cedula, que es crítico`)
 
   let lanzo = false
-  try { exp.decidir('aprobar', { motivo: 'x' }) } catch { lanzo = true }
+  try { exp.decidir('aprobar', { motivo: 'x', oficial: 'smoke' }) } catch { lanzo = true }
   exigir(lanzo, 'un expediente incompleto NO puede aprobarse')
   ok('y no se puede aprobar: el software nunca aprueba solo')
 

@@ -74,7 +74,7 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **312 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **313 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **12 puertas**, cada una eliminatoria |
@@ -133,9 +133,35 @@ El valor asentado **se conserva**, el conflicto queda levantado con las dos cita
 enfrentadas, y la firma se para en seco:
 
 ```bash
-node cli.mjs aprobar --ledger datos/EXP-003.jsonl --texto "visto bueno"
+node cli.mjs aprobar --ledger datos/EXP-003.jsonl --oficial "A. Ruiz" --texto "visto bueno"
 #  ✗ No se puede aprobar: hay un campo con dos fuentes que se contradicen
 #    (titular.nombre). Resuélvase el conflicto antes de firmar.
+```
+
+### ✍ Y no se firma sin decir quién firma
+
+El evento de decisión decía `origen: HUMANO` y ahí se acababa la trazabilidad:
+no decía **qué** humano. Un expediente aprobado del que no consta quién lo
+aprobó es inauditable.
+
+El **Acuerdo 1-2026** de la Superintendencia de Bancos de Panamá —vigente desde
+el 16 de enero de 2026, que **deroga el 10-2015**— exige constancia documentada
+de la debida diligencia (art. 10.4) y que el expediente permita **reconstruir**
+la operación durante cinco años (art. 29). Sin firmante no hay reconstrucción.
+
+```bash
+node cli.mjs aprobar --ledger datos/EXP-001.jsonl --texto "Documentación conforme"
+#  ✗ Aprobar exige identificar al oficial que firma. Una decisión sin firmante
+#    no se puede reconstruir, y el expediente debe poder reconstruirse durante
+#    cinco años.
+```
+
+Con firmante, queda escrito **dentro de la cadena de hashes** — cambiar el
+nombre del oficial rompe `npm run verify:invariantes`:
+
+```
+  ✍ APROBAR  M. Batista · oficial de cuenta · suc. Vía España
+     2026-09-10T12:33:42.309Z  ·  «Revisado en sucursal. Documentación conforme.»
 ```
 
 Rechazarlo sí se permite: cerrar un expediente contradictorio es exactamente lo
@@ -144,7 +170,7 @@ que un oficial debe poder hacer. Fijado por **CU-19** y **CU-23**.
 Y el expediente **no se puede aprobar** tampoco cuando le falta un campo crítico:
 
 ```bash
-node cli.mjs aprobar --ledger /tmp/demo/e.jsonl --texto "confío"
+node cli.mjs aprobar --ledger /tmp/demo/e.jsonl --texto "confío" --oficial "A. Ruiz"
 #  ✗ No se puede aprobar un expediente en estado VALIDADO
 ```
 
@@ -193,7 +219,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 312 tests, sin modelo y sin red
+npm test                  # 313 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -208,7 +234,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **312/312** | 1 s |
+| `npm test` → **313/313** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **11/11 puertas
@@ -272,7 +298,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **312 / 312** verdes, sin modelo y sin red |
+| Tests | **313 / 313** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **~62 %** |
 | Casos de uso punta a punta | **18** |
 | Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G8 |

@@ -74,9 +74,13 @@ cli(['revisar',
 
 cli(['aprobar',
      '--ledger', join(DATOS, 'EXP-001.jsonl'),
-     '--texto', 'Revisado en sucursal. Documentación conforme.'],
-    '      ...y una persona lo aprueba',
-    'el software nunca aprueba solo: aprobar es un acto humano, y queda firmado')
+     '--texto', 'Revisado en sucursal. Documentación conforme.',
+     // Quién firma queda en el ledger. Sin esto el comando se niega a correr:
+     // un expediente aprobado del que no consta quién lo aprobó no se puede
+     // reconstruir, y reconstruirlo es exactamente lo que exige el regulador.
+     '--oficial', 'M. Batista · oficial de cuenta · suc. Vía España'],
+    '      ...y una persona lo aprueba, y consta cuál',
+    'el software nunca aprueba solo: aprobar es un acto humano, firmado y con nombre')
 
 // ── 2 · EL EXPEDIENTE CON INVENCIONES ──────────────────────────────────────
 // Mismo dictado, pero la extracción trae tres campos que nadie dijo.

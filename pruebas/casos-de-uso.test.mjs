@@ -77,7 +77,7 @@ test('CU-1 · un oficial dicta, el sistema extrae, una PERSONA aprueba', () => {
     assert.equal(revision.resumen.rechazados, 0)
     assert.equal(exp.leer().estado, 'COMPLETO', 'sin críticos ausentes, el expediente cierra solo')
 
-    const final = exp.decidir('aprobar', { motivo: 'documentos verificados en ventanilla' })
+    const final = exp.decidir('aprobar', { motivo: 'documentos verificados en ventanilla', oficial: 'A. Ruiz · oficial de cuenta' })
 
     assert.equal(final.estado, 'APROBADO')
     assert.equal(final.campos['titular.cedula'].valor, '8-123-456')
@@ -150,7 +150,7 @@ test('CU-3 · MEDIDO · un expediente con datos inventados NO se puede aprobar',
       documentos: []
     })
 
-    assert.throws(() => exp.decidir('aprobar', { motivo: 'me fío' }),
+    assert.throws(() => exp.decidir('aprobar', { motivo: 'me fío', oficial: 'A. Ruiz · oficial de cuenta' }),
       /No se puede aprobar un expediente en estado VALIDADO/,
       'un dato inventado no rellena un hueco: lo deja igual de vacío')
   } finally { cerrar() }
@@ -173,7 +173,7 @@ test('CU-4 · EL SOFTWARE NUNCA APRUEBA SOLO', () => {
     assert.notEqual(antes.estado, 'APROBADO')
     assert.equal(antes.decisiones.length, 0)
 
-    const despues = exp.decidir('aprobar', { motivo: 'revisado por la oficial de cuenta' })
+    const despues = exp.decidir('aprobar', { motivo: 'revisado por la oficial de cuenta', oficial: 'A. Ruiz · oficial de cuenta' })
     assert.equal(despues.estado, 'APROBADO')
     assert.equal(despues.historial.at(-1).origen, ORIGENES.HUMANO)
   } finally { cerrar() }
@@ -187,7 +187,7 @@ test('CU-5 · un RECHAZO exige motivo, o no se registra', () => {
     assert.throws(() => exp.decidir('rechazar'), /exige motivo/,
       'un rechazo sin causa no es auditable')
 
-    const e = exp.decidir('rechazar', { motivo: 'la cédula está vencida' })
+    const e = exp.decidir('rechazar', { motivo: 'la cédula está vencida', oficial: 'A. Ruiz · oficial de cuenta' })
     assert.equal(e.estado, 'RECHAZADO')
     assert.match(e.historial.at(-1).motivo, /vencida/)
   } finally { cerrar() }
@@ -280,7 +280,7 @@ test('CU-9 · el expediente se puede RECONSTRUIR entero desde los hechos', () =>
   try {
     exp.capturar(DICTADO)
     exp.asentar(EXTRACCION_BUENA)
-    exp.decidir('aprobar', { motivo: 'ok' })
+    exp.decidir('aprobar', { motivo: 'ok', oficial: 'A. Ruiz · oficial de cuenta' })
 
     // Nada está guardado: todo se deduce. Dos lecturas seguidas son idénticas.
     assert.equal(JSON.stringify(exp.leer()), JSON.stringify(exp.leer()))
@@ -339,9 +339,9 @@ test('CU-12 · un expediente APROBADO es terminal: no admite nada más', () => {
   try {
     exp.capturar(DICTADO)
     exp.asentar(EXTRACCION_BUENA)
-    exp.decidir('aprobar', { motivo: 'ok' })
+    exp.decidir('aprobar', { motivo: 'ok', oficial: 'A. Ruiz · oficial de cuenta' })
 
-    assert.throws(() => exp.decidir('rechazar', { motivo: 'me arrepentí' }),
+    assert.throws(() => exp.decidir('rechazar', { motivo: 'me arrepentí', oficial: 'A. Ruiz · oficial de cuenta' }),
       /No se puede rechazar/,
       'para cambiar una decisión firmada hace falta un expediente nuevo, no un editor de texto')
   } finally { cerrar() }
@@ -401,7 +401,7 @@ test('CU-14 · dos sucursales con los mismos hechos producen el MISMO expediente
     try {
       exp.capturar(DICTADO)
       exp.asentar(EXTRACCION_BUENA)
-      exp.decidir('aprobar', { motivo: 'ok' })
+      exp.decidir('aprobar', { motivo: 'ok', oficial: 'A. Ruiz · oficial de cuenta' })
       const e = exp.leer()
       return JSON.stringify({ campos: e.campos, huecos: e.huecos, estado: e.estado })
     } finally { cerrar() }
@@ -782,7 +782,7 @@ test('CU-23 · ⭐ un expediente con el titular en disputa NO se puede aprobar',
 
     // LA FIRMA SE PARA.
     const hechosAntes = leer(ruta).length
-    assert.throws(() => exp.decidir('aprobar', { motivo: 'visto bueno' }),
+    assert.throws(() => exp.decidir('aprobar', { motivo: 'visto bueno', oficial: 'A. Ruiz · oficial de cuenta' }),
       /se contradicen \(titular\.nombre\)/,
       'no se aprueba un expediente cuyo titular está en disputa')
     assert.equal(leer(ruta).length, hechosAntes,
@@ -790,7 +790,72 @@ test('CU-23 · ⭐ un expediente con el titular en disputa NO se puede aprobar',
 
     // Rechazar SÍ se permite: cerrar un expediente contradictorio es
     // exactamente lo que un oficial debe poder hacer.
-    const tras = exp.decidir('rechazar', { motivo: 'titular en disputa entre dos documentos' })
+    const tras = exp.decidir('rechazar', { motivo: 'titular en disputa entre dos documentos', oficial: 'A. Ruiz · oficial de cuenta' })
     assert.equal(tras.estado, 'RECHAZADO')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CU-24 · ⭐ UNA FIRMA SIN FIRMANTE NO ES UNA FIRMA
+//
+//  El evento de decisión decía `origen: HUMANO` y ahí se acababa la
+//  trazabilidad: no decía QUÉ humano. Un expediente aprobado del que no consta
+//  quién lo aprobó es inauditable, y este proyecto se presenta precisamente
+//  como el que hace auditable la admisión.
+//
+//  El Acuerdo 1-2026 de la Superintendencia de Bancos de Panamá —vigente desde
+//  el 16 de enero de 2026, deroga el 10-2015— exige constancia documentada de
+//  la debida diligencia (art. 10.4) y que el expediente permita RECONSTRUIR la
+//  operación durante cinco años (art. 29). Sin firmante no hay reconstrucción.
+// ═══════════════════════════════════════════════════════════════════════════
+test('CU-24 · ⭐ no se aprueba ni se rechaza sin decir quién firma', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-firma-'))
+  const ruta = join(dir, 'e.jsonl')
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta, esquema: ESQ, id: 'EXP-F',
+      ahora: () => `2026-09-11T00:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+
+    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
+    exp.asentar({ titular: {
+      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
+      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } },
+      documentos: [{ tipo: 'RECIBO_SERVICIO',
+        emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
+        fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
+        monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }] })
+
+    const hechosAntes = leer(ruta).length
+
+    // Sin oficial no se firma, ni para aprobar ni para rechazar.
+    assert.throws(() => exp.decidir('aprobar', { motivo: 'todo conforme' }),
+      /exige identificar al oficial/, 'aprobar sin firmante se niega')
+    assert.throws(() => exp.decidir('rechazar', { motivo: 'no procede' }),
+      /exige identificar al oficial/, 'rechazar sin firmante también')
+    assert.throws(() => exp.decidir('aprobar', { motivo: 'ok', oficial: '   ' }),
+      /exige identificar al oficial/, 'ni con espacios en blanco')
+
+    assert.equal(leer(ruta).length, hechosAntes,
+      'y ninguno de los tres intentos dejó un evento en el ledger')
+
+    // Con firmante sí, y el ledger dice quién fue.
+    const e = exp.decidir('aprobar', {
+      motivo: 'Documentación verificada en ventanilla.',
+      oficial: 'A. Ruiz · oficial de cuenta · suc. Vía España'
+    })
+    assert.equal(e.estado, 'APROBADO')
+
+    const decision = e.decisiones.at(-1)
+    assert.equal(decision.que, 'aprobar')
+    assert.equal(decision.oficial, 'A. Ruiz · oficial de cuenta · suc. Vía España',
+      'quién firmó se puede leer del expediente, no solo del archivo crudo')
+
+    // Y está en el ledger, dentro de la cadena de hashes: no se puede cambiar
+    // el nombre del firmante sin romper la verificación.
+    const evento = leer(ruta).find(h => h.tipo === 'DECISION_HUMANA')
+    assert.equal(evento.oficial, 'A. Ruiz · oficial de cuenta · suc. Vía España')
+    assert.ok(exp.verificar().intacta, 'la cadena sigue íntegra')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

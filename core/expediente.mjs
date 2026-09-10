@@ -222,13 +222,36 @@ export function abrirExpediente ({
      * en la puerta: un error que llega antes de escribir en un ledger
      * append-only vale más que uno que llega después.
      */
-    decidir (que, { motivo = null } = {}) {
+    decidir (que, { motivo = null, oficial = null } = {}) {
       const hacia = que === 'aprobar' ? ESTADOS.APROBADO
                   : que === 'rechazar' ? ESTADOS.RECHAZADO
                   : null
       if (!hacia) throw new Error(`decidir() acepta 'aprobar' o 'rechazar', no "${que}"`)
       if (hacia === ESTADOS.RECHAZADO && !motivo) {
         throw new Error('Rechazar exige motivo. Un rechazo sin causa no es auditable.')
+      }
+
+      // ── UNA FIRMA SIN FIRMANTE NO ES UNA FIRMA ─────────────────────────────
+      //
+      // El evento decía `origen: HUMANO` y ahí se acababa la trazabilidad: no
+      // decía QUÉ humano. Un expediente aprobado del que no consta quién lo
+      // aprobó es exactamente lo que un supervisor bancario no puede aceptar,
+      // y lo que este proyecto dice evitar.
+      //
+      // El Acuerdo 1-2026 de la Superintendencia de Bancos de Panamá —vigente
+      // desde el 16 de enero de 2026, deroga el 10-2015— exige en su artículo
+      // 10.4 «constancia documentada» de la debida diligencia, y en el 29 que
+      // el expediente permita la RECONSTRUCCIÓN de la operación durante cinco
+      // años. Reconstruir sin saber quién firmó no es reconstruir.
+      //
+      // Se pide como texto libre a propósito: el núcleo no tiene —ni debe
+      // tener— un directorio de empleados. Quién es un oficial válido es una
+      // pregunta de la instalación, no del expediente.
+      if (!oficial || !String(oficial).trim()) {
+        throw new Error(
+          `${que === 'aprobar' ? 'Aprobar' : 'Rechazar'} exige identificar al oficial que firma. ` +
+          'Una decisión sin firmante no se puede reconstruir, y el expediente ' +
+          'debe poder reconstruirse durante cinco años.')
       }
 
       // ── SE COMPRUEBA TODO **ANTES** DE ESCRIBIR EL EVENTO ──────────────────
@@ -266,8 +289,12 @@ export function abrirExpediente ({
           'Resuélvase el conflicto antes de firmar.')
       }
 
-      hecho(EVENTO.DECISION_HUMANA, { origen: ORIGENES.HUMANO, motivo, datos: { que } })
-      hecho(EVENTO.TRANSICION, { origen: ORIGENES.HUMANO, motivo, datos: { desde, hacia } })
+      hecho(EVENTO.DECISION_HUMANA, {
+        origen: ORIGENES.HUMANO, motivo, oficial: String(oficial).trim(), datos: { que }
+      })
+      hecho(EVENTO.TRANSICION, {
+        origen: ORIGENES.HUMANO, motivo, oficial: String(oficial).trim(), datos: { desde, hacia }
+      })
       return this.leer()
     },
 

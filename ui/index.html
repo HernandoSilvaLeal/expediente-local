@@ -229,6 +229,18 @@ async function abrirExpediente (id) {
       </table>
     </div>` : ''}
 
+    ${(e.decisiones || []).length ? (d => `<div class="tarjeta">
+      <h2>Quién firmó</h2>
+      <table>
+        <tr>
+          <td class="ruta mono">${esc(d.que)}</td>
+          <td><b>${esc(d.oficial || '—')}</b>
+            <div class="motivo">${esc(d.ts)}</div>
+            ${d.motivo ? `<div class="cita">«${esc(d.motivo)}»</div>` : ''}</td>
+        </tr>
+      </table>
+    </div>`)(e.decisiones[e.decisiones.length - 1]) : ''}
+
     ${(e.conflictos || []).length ? `<div class="tarjeta hueco">
       <h2>⚔ Dos fuentes se contradicen</h2>
       <p class="aviso" style="padding-top:0">el sistema no elige ni promedia: lo decide una persona</p>
