@@ -77,7 +77,7 @@ cd expediente-local && npm ci
 | Que el núcleo funciona | `npm test` | **313 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
-| Que nada descalifica | `npm run verify:entrega` | **12 puertas**, cada una eliminatoria |
+| Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
 | Que **cada guardia** hace su trabajo | `npm run casos` | **13 casos trampa**, cobertura G1..G8 |
 | Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
@@ -237,8 +237,8 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 | `npm test` → **313/313** | 1 s |
 | **TOTAL** | **193 s** |
 
-Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **11/11 puertas
-de entrega en PASS**. El detalle está en [`audit/clon-limpio.json`](audit/clon-limpio.json).
+Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
+puertas de entrega en PASS** — eran 11 el día de la medición; hoy son 13. El detalle está en [`audit/clon-limpio.json`](audit/clon-limpio.json).
 
 > Se publica el caso **peor**: 190 de los 193 segundos son la descarga sin caché. En una
 > máquina que ya tenga caché de npm es mucho menos.

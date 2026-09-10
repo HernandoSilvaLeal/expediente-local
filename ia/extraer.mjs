@@ -198,7 +198,24 @@ export function crearExtractor ({
         // El dispositivo se lee de stats.backendDevice (0=CPU, 1=GPU).
         // getSystemResources() NO sirve para esto.
         dispositivo: stats.backendDevice ?? null,
-        delegado: Boolean(delegate),
+        // ── LO QUE PEDIMOS, NO LO QUE PASÓ. Y SE LLAMA COMO LO QUE ES ───────
+        //
+        // Este campo se llamaba `delegado` y valía `Boolean(delegate)`. Es
+        // decir: informaba de su propio parámetro de entrada y lo publicaba en
+        // `audit/inference_log.csv` como si fuera una observación.
+        //
+        // Si la delegación se pide y cae a local —que es justo lo que hace
+        // `fallbackToLocal`— la fila decía «delegado: true» mientras la
+        // inferencia corría en esta máquina. Un campo de auditoría que afirma
+        // algo que no midió es peor que no tener el campo: lo encontró nuestra
+        // propia auditoría, que es exactamente donde más duele.
+        //
+        // Se buscó la verdad en el SDK: `@qvac/inference` 0.18.2 no expone
+        // dónde se ejecutó la inferencia en ningún campo de `stats` —el único
+        // «delegated» del paquete está dentro de un comentario—. Así que el
+        // dato NO EXISTE, y se dice, en vez de inventarlo.
+        delegacionSolicitada: Boolean(delegate),
+        ejecutadoEn: 'NO_REPORTADO',
         caracteres: texto.length
       })
       registro.push(fila)

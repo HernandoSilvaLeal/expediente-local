@@ -3,4 +3,4 @@
 # que, al descubrirse, hace que nadie se crea el resto de la auditoría.
 # La primera fila irá marcada frio=true y NO entra en las medianas: el arranque en frío
 # contamina la media y produce un número que no describe ni el caso frío ni el caliente.
-n,frio,pared_ms,ttft_ms,tok_s,prompt_tokens,emitidos,dispositivo,delegado,caracteres
+n,frio,pared_ms,ttft_ms,tok_s,prompt_tokens,emitidos,dispositivo,delegacion_solicitada,ejecutado_en,caracteres

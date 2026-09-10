@@ -1,7 +1,7 @@
 {
   "_": "Dos corridas independientes del flujo completo. El diff tiene que estar vacío.",
   "_por_que": "Determinismo es una propiedad comprobable, no una promesa. Si dos corridas del mismo sistema con la misma entrada difieren, no es determinista, y da igual lo que diga el README.",
-  "fecha": "2026-09-10T05:51:36.311Z",
+  "fecha": "2026-09-10T12:37:54.286Z",
   "identicas": true,
   "corrida_1": {
     "ok": true,
@@ -13,7 +13,7 @@
       "documentos[0].emisor": "SIN_ANCLAJE",
       "titular.cedula": "SIN_ANCLAJE"
     },
-    "hechos": 6,
+    "hechos": 5,
     "cadena": "intacta"
   },
   "corrida_2": {
@@ -26,7 +26,7 @@
       "documentos[0].emisor": "SIN_ANCLAJE",
       "titular.cedula": "SIN_ANCLAJE"
     },
-    "hechos": 6,
+    "hechos": 5,
     "cadena": "intacta"
   },
   "comando": "npm run smoke && npm run smoke  # y comparar"

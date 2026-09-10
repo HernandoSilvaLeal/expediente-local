@@ -259,7 +259,11 @@ if (!existsSync(join(AUDIT, 'inference_log.csv'))) {
     '# que, al descubrirse, hace que nadie se crea el resto de la auditoría.\n' +
     '# La primera fila irá marcada frio=true y NO entra en las medianas: el arranque en frío\n' +
     '# contamina la media y produce un número que no describe ni el caso frío ni el caliente.\n' +
-    'n,frio,pared_ms,ttft_ms,tok_s,prompt_tokens,emitidos,dispositivo,delegado,caracteres\n')
+    'n,frio,pared_ms,ttft_ms,tok_s,prompt_tokens,emitidos,dispositivo,' +
+    // `delegacion_solicitada` es lo que pedimos; `ejecutado_en` es dónde corrió
+    // de verdad, y el SDK 0.18.2 no lo reporta: por eso vale NO_REPORTADO y no
+    // un booleano deducido del parámetro de entrada. Ver ia/extraer.mjs.
+    'delegacion_solicitada,ejecutado_en,caracteres\n')
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -274,6 +278,11 @@ const FILAS = [
   ['Un valor sin cita literal no entra al dataset', 'core/anclaje.mjs', 'T3-01..05', 'npm test'],
   ['Los errores del modelo son REALES, no inventados', 'pruebas/anclaje.test.mjs', 'T3-medido-1..5', 'npm test'],
   ['El software nunca aprueba solo', 'core/estado.mjs · SOLO_HUMANO', 'T2-humano ×6', 'npm test'],
+  ['Y no se aprueba sin decir QUIÉN firma', 'core/expediente.mjs · decidir()', 'CU-24', 'npm test'],
+  ['El firmante va dentro del hash: cambiarlo rompe la cadena', 'core/ledger.mjs · crearEvento', 'CU-24', 'npm run verify:invariantes'],
+  ['Dos fuentes que se contradicen NO se resuelven solas', 'core/proyeccion.mjs · asentar()', 'CU-19, CU-20, CU-23', 'npm test'],
+  ['Un conflicto abierto impide cerrar Y impide firmar', 'core/calidad.mjs · puedeCerrar', 'CU-23', 'npm test'],
+  ['El log de inferencia NO afirma dónde corrió, porque el SDK no lo dice', 'ia/extraer.mjs · ejecutadoEn', 'NO_REPORTADO, declarado', 'cat audit/inference_log.csv'],
   ['El anclaje es determinista', 'core/anclaje.mjs', 'T3-19, mil corridas', 'npm test'],
   ['El expediente se regenera del ledger', 'core/proyeccion.mjs', 'T5-O5, matando el proceso', 'npm test'],
   ['No existe forma de actualizar ni borrar un hecho', 'core/ledger.mjs', 'T5-01, once nombres prohibidos', 'npm test'],

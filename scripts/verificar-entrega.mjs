@@ -23,10 +23,11 @@
 //     «Sovereign Intelligence at the Edge» es el track 03 del hackathon, y
 //     marcarlo sería un falso positivo que enseña a ignorar el aviso
 
-import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync, existsSync, lstatSync, readlinkSync } from 'node:fs'
 import { join, relative, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const rel = (p) => relative(RAIZ, p)
@@ -129,6 +130,65 @@ puerta('todas las dependencias declaradas están fijadas', () => {
     .map(([k, v]) => `${k}@${v}`)
   return { ok: sueltas.length === 0, detalle: sueltas.join(', ') }
 }, 'un ^ resuelve a otra versión en la máquina del juez. Nosotros necesitamos 0.18.2 EXACTA')
+
+puerta('el SDK instalado es el que declara package.json', () => {
+  // ── LO QUE ESTA PUERTA IMPIDE ────────────────────────────────────────────
+  //
+  // `startQVACProvider` y `stopQVACProvider` existen en @qvac/sdk 0.18.2 y NO
+  // existen en 0.19.0 — comprobado leyendo los exports de las dos versiones,
+  // no supuesto. Toda la delegación del proyecto depende de esa diferencia.
+  //
+  // Y Node resuelve por CERCANÍA, no por lo que diga el package.json: un
+  // `node_modules` dentro de una subcarpeta sombrea al de la raíz sin avisar.
+  // Aquí mismo pasa: malla/node_modules trae una 0.19.0 que gana sobre la
+  // 0.18.2 declarada, y el proveedor se niega a arrancar con un mensaje que
+  // parece un fallo del código cuando es un fallo del entorno.
+  //
+  // No se puede depurar eso en cámara. Por eso es una puerta y no un comentario.
+  const pkg = JSON.parse(readFileSync(join(RAIZ, 'package.json'), 'utf8'))
+  const declarada = (pkg.dependencies ?? {})['@qvac/sdk']
+  if (!declarada) return { ok: true, detalle: 'el proyecto no declara @qvac/sdk' }
+
+  // Desde qué archivos se importa de verdad. Cada uno resuelve por su cuenta.
+  const puntos = ['ia/extraer.mjs', 'malla/proveedor.mjs', 'malla/consumidor.mjs', 'malla/motor.mjs']
+  const req = createRequire(import.meta.url)
+  const vistos = []
+  for (const punto of puntos) {
+    const abs = join(RAIZ, punto)
+    if (!existsSync(abs)) continue
+    try {
+      const v = createRequire(abs)('@qvac/sdk/package.json').version
+      if (v !== declarada) vistos.push(`${punto} → ${v}`)
+    } catch (e) {
+      // Que no esté instalado NO es un fallo de entrega: el núcleo entero corre
+      // sin el SDK, y eso es la frontera 95/5, no un descuido. `npm ci` lo trae.
+      if (e.code === 'MODULE_NOT_FOUND') continue
+      // ERR_PACKAGE_PATH_NOT_EXPORTED significa que SÍ hay un paquete ahí, pero
+      // no deja leer su package.json: se mira el directorio a mano.
+      try {
+        const nm = join(dirname(abs), 'node_modules', '@qvac')
+        const dir = join(nm, 'sdk', 'package.json')
+        if (existsSync(dir)) {
+          const v = JSON.parse(readFileSync(dir, 'utf8')).version
+          if (v !== declarada) {
+            // Decir DE DÓNDE sale la versión intrusa, no solo cuál es: si el
+            // node_modules es un enlace a otro proyecto, el mensaje «tienes la
+            // 0.19.0» manda a buscar donde no está. Aquí lo era, y apuntaba
+            // fuera del repositorio.
+            const donde = lstatSync(nm).isSymbolicLink()
+              ? `enlace → ${readlinkSync(nm)}`
+              : 'node_modules propio'
+            vistos.push(`${punto} → ${v} (${donde})`)
+          }
+        }
+      } catch { /* sin información: no se inventa un veredicto */ }
+    }
+  }
+  return {
+    ok: vistos.length === 0,
+    detalle: vistos.length ? `declarada ${declarada}, pero ${vistos.join(' · ')}` : ''
+  }
+}, 'la delegación existe en 0.18.2 y NO en 0.19.0. Un node_modules de subcarpeta gana sin avisar')
 
 puerta('existe package-lock.json y `npm ci` puede correr', () => {
   // CAZADO CRONOMETRANDO EL CLON LIMPIO, que es exactamente para lo que sirve
