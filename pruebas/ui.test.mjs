@@ -751,3 +751,46 @@ test('UI-43 · la constancia dice cuando el expediente NO se puede firmar', asyn
   assert.match(d.constancia, /asentado/)
   assert.match(d.constancia, /propuesto/)
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-12 · LA COMPLEJIDAD SE ABSORBE, NO SE REPARTE
+//
+//  Lo que el sistema puede saber, el sistema lo sabe. Cada campo que se le pide
+//  rellenar a quien tiene un cliente delante es un segundo mirando la pantalla
+//  en vez de a la persona.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-44 · ⭐ el número de expediente lo propone el sistema', async () => {
+  const d = await (await fetch(`${BASE}/api/siguiente-id`)).json()
+  assert.match(d.id, /^[A-Za-z]/, 'un identificador con forma, no un contador suelto')
+
+  // Y avanza: dos clientes seguidos no reciben el mismo número.
+  await post(`/api/capturar/${d.id}`, { rol: 'oficial', texto: 'El titular es Ana Ruiz.' })
+  const siguiente = await (await fetch(`${BASE}/api/siguiente-id`)).json()
+  assert.notEqual(siguiente.id, d.id)
+})
+
+test('UI-45 · es determinista: dos llamadas seguidas dan lo mismo', async () => {
+  // Si el número saltara entre lecturas, dos pestañas abiertas propondrían
+  // cosas distintas y el oficial no sabría cuál vale.
+  const a = await (await fetch(`${BASE}/api/siguiente-id`)).json()
+  const b = await (await fetch(`${BASE}/api/siguiente-id`)).json()
+  assert.equal(a.id, b.id)
+})
+
+test('UI-46 · ⭐ la pregunta al cliente se puede decir en voz alta', async () => {
+  const d = await (await fetch(`${BASE}/api/expediente/EXP-002`)).json()
+  const criticas = d.preguntas.filter(q => q.critico)
+  assert.ok(criticas.length, 'hay algo que pedir')
+
+  for (const q of criticas) {
+    // Empieza por un VERBO: qué hacer, no qué pasó.
+    assert.match(q.pregunta, /^(Pídele|Pide|Pregunta|Confirma)/,
+      `no empieza por lo que hay que hacer: «${q.pregunta}»`)
+    // Y sigue diciendo por qué, que es lo que hace que la segunda vez salga bien.
+    assert.match(q.pregunta, /:/, 'el porqué va después de los dos puntos')
+    // En español de verdad, no en ruta de esquema.
+    assert.ok(!/titular\.|documentos\[|_/.test(q.pregunta),
+      `la ruta del esquema se coló en la pregunta: «${q.pregunta}»`)
+  }
+})

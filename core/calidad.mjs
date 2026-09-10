@@ -188,27 +188,87 @@ export function siguientePregunta (expediente, esquema) {
  * esto en pantalla, y que sea siempre igual es una ventaja: se aprende. Un texto
  * distinto en cada corrida obliga a leerlo entero cada vez.
  */
+/**
+ * La pregunta que el oficial le hace al cliente, con esas palabras.
+ *
+ * ── SE ESCRIBE PARA QUIEN LA VA A DECIR EN VOZ ALTA ───────────────────────
+ *
+ * La primera versión decía: «No se pudo confirmar la cédula del titular: lo
+ * propuesto no aparece literalmente en el documento. ¿Puede leerlo del original
+ * y dictarlo tal cual está escrito?».
+ *
+ * Todo cierto, y todo nuestro: «lo propuesto», «literalmente», «anclaje» son
+ * palabras del sistema explicándose a sí mismo. Quien tiene un cliente delante
+ * no necesita entender por qué falla — necesita saber qué pedir.
+ *
+ * La regla: **verbo primero, y que quepa en un renglón.** Si no se puede decir
+ * en voz alta sin releerla, está mal escrita.
+ */
 function redactar (ruta, hueco) {
   const q = legible(ruta)
-  if (!hueco) return `Falta ${q}. ¿Aparece en algún documento del expediente?`
+  const motivo = hueco?.motivos?.[0]
 
-  const motivo = hueco.motivos?.[0]
+  // El PORQUÉ va después de los dos puntos, y no se quita: decirle al oficial
+  // qué falló es lo que hace que la segunda vez salga bien. Lo que cambió es el
+  // orden — primero qué hacer, después por qué— y que quepa en un renglón.
+  if (!hueco) return `Pídele ${q}: no aparece en ningún documento del expediente.`
   if (motivo === 'SIN_ANCLAJE') {
-    return `No se pudo confirmar ${q}: lo propuesto no aparece literalmente en el documento. ` +
-           '¿Puede leerlo del original y dictarlo tal cual está escrito?'
+    return `Pídele ${q} y pide dictarlo tal cual: lo que se leyó no aparece literalmente en el documento.`
   }
   if (motivo === 'UNIDAD_AUSENTE' || motivo === 'UNIDAD_EN_VALOR') {
-    return `Falta la unidad de ${q}. ¿En qué moneda o unidad está expresado?`
+    return `Pregunta en qué moneda está ${q}: falta la unidad.`
   }
-  if (motivo === 'FUERA_DE_ENUM') {
-    return `El valor de ${q} no es uno de los admitidos. ¿Cuál de las opciones corresponde?`
-  }
-  return `Falta ${q}. ¿Puede aportarlo?`
+  if (motivo === 'FUERA_DE_ENUM') return `Confirma cuál es ${q}: el valor no es uno de los válidos.`
+  if (motivo === 'DOCUMENTO_VENCIDO') return `Pide ${q} más reciente: el documento está vencido.`
+  return `Pídele ${q}.`
 }
 
 /** `titular.cedula` → «la cédula del titular». Tabla, no adivinanza. */
+/**
+ * `titular.cedula` → «la cédula del titular».
+ *
+ * ── SE ESCRIBE COMO SE HABLA, NO COMO SE GUARDA ───────────────────────────
+ *
+ * Devolvía «cedula de titular»: sin acento, sin artículo y con el genitivo
+ * suelto. Es la ruta del esquema con los puntos cambiados por espacios — o sea,
+ * nuestra estructura de datos asomando por la pantalla.
+ *
+ * La tabla es explícita a propósito: adivinar el género y el artículo de una
+ * palabra en español es un problema que no queremos tener, y un dominio nuevo
+ * añade cinco líneas aquí y se acabó.
+ */
+const COMO_SE_DICE = Object.freeze({
+  'titular.nombre':             'el nombre del titular',
+  'titular.cedula':             'la cédula',
+  'titular.fecha_nacimiento':   'la fecha de nacimiento',
+  'titular.genero':             'el género',
+  'titular.nacionalidad':       'la nacionalidad',
+  'titular.pais_nacimiento':    'el país de nacimiento',
+  'titular.pais_domicilio':     'el país de domicilio',
+  'titular.profesion_u_oficio': 'la profesión u oficio',
+  'titular.actividad_ingreso':  'la actividad de la que vienen sus ingresos',
+  'titular.origen_recursos':    'de dónde vienen los fondos',
+  'titular.destino_recursos':   'a dónde van los fondos',
+  'titular.direccion':          'la dirección',
+  'titular.contacto':           'un teléfono de contacto',
+  'operacion.producto':         'qué producto quiere abrir',
+  'operacion.tipo_transaccion': 'qué tipo de movimientos va a hacer',
+  'operacion.monto_transaccional': 'por cuánto, más o menos',
+  'operacion.frecuencia':       'cada cuánto',
+  'operacion.canal':            'por qué canal va a operar',
+  'documentos[].tipo':          'qué documento es',
+  'documentos[].emisor':        'quién emitió el documento',
+  'documentos[].fecha_emision': 'la fecha del documento',
+  'documentos[].monto':         'el monto del documento'
+})
+
 function legible (ruta) {
-  const limpia = rutaGenerica(ruta).replace(/\[\]/g, '')
+  const generica = rutaGenerica(ruta)
+  if (COMO_SE_DICE[generica]) return COMO_SE_DICE[generica]
+
+  // Sin entrada en la tabla se cae a la ruta legible. No es bonito, y que no lo
+  // sea es útil: se nota enseguida qué campo falta por traducir.
+  const limpia = generica.replace(/\[\]/g, '')
   const partes = limpia.split('.')
   const campo = partes.at(-1).replace(/_/g, ' ')
   const grupo = partes.length > 1 ? partes.slice(0, -1).join(' ').replace(/_/g, ' ') : null

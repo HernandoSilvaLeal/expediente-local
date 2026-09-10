@@ -126,6 +126,35 @@ const servidor = createServer(async (req, res) => {
       }
     }
 
+    // ── EL SIGUIENTE NÚMERO LO SABE EL SISTEMA, NO EL OFICIAL ──────────────
+    //
+    // Pedirle a quien atiende a un cliente que invente un identificador es
+    // pasarle complejidad NUESTRA: es un detalle de cómo guardamos las cosas,
+    // no una decisión de su trabajo. Y en una ventanilla con alguien delante,
+    // cada campo que hay que rellenar es un segundo mirando la pantalla en vez
+    // de a la persona.
+    //
+    // Se calcula del prefijo más usado y el número más alto. Determinista y
+    // repetible: dos llamadas seguidas dan lo mismo mientras nadie capture.
+    // Y es una PROPUESTA, no una imposición — el campo se puede cambiar.
+    if (url.pathname === '/api/siguiente-id') {
+      const ids = existsSync(DATOS)
+        ? readdirSync(DATOS).filter(f => f.endsWith('.jsonl')).map(f => f.slice(0, -6))
+        : []
+      const partes = ids.map(i => /^(.*?)(\d+)$/.exec(i)).filter(Boolean)
+      if (!partes.length) return enviar(200, { id: 'EXP-001' })
+
+      // El prefijo que más se repite: si la sucursal ya usa uno, se sigue.
+      const cuenta = {}
+      for (const [, pre] of partes) cuenta[pre] = (cuenta[pre] ?? 0) + 1
+      const prefijo = Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0][0]
+
+      const suyos = partes.filter(([, pre]) => pre === prefijo)
+      const alto = Math.max(...suyos.map(([, , n]) => Number(n)))
+      const ancho = suyos[0][2].length
+      return enviar(200, { id: prefijo + String(alto + 1).padStart(ancho, '0') })
+    }
+
     if (url.pathname === '/api/expedientes') {
       const lista = expedientes()
       return enviar(200, {

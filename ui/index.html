@@ -218,6 +218,11 @@ textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
 .ahora b{color:var(--apagado); margin-right:6px}
 .ahora.mio{border-left-color:var(--mint)}
 .ahora.mio b{color:var(--mint)}
+/* Lo que hay que pedirle al cliente, con las palabras exactas. El sistema ya
+   calculaba estas preguntas y las enseñaba al final de la página, donde nadie
+   las lee cuando tiene a alguien delante. */
+.pedir{margin:8px 0 0; padding-left:18px; font-size:12.5px; color:var(--texto)}
+.pedir li{margin:4px 0}
 /* Los comandos, en la misma tabla que todo lo demás: quien evalúa técnicamente
    no debería tener que buscar en el README qué correr para comprobar lo que
    tiene delante. */
@@ -382,11 +387,21 @@ function pintarCaptura () {
 
   caja.innerHTML = `
     <h2>Nuevo expediente</h2>
-    <input class="campo" id="cap-id" type="text" placeholder="Número de expediente">
+    <input class="campo" id="cap-id" type="text" placeholder="Número de expediente"
+           title="Lo propone el sistema. Puedes cambiarlo si tu sucursal usa otro.">
     <textarea class="campo" id="cap-texto" rows="5"
               placeholder="Lo que dicta el cliente, tal cual. No lo resumas: la fuente se guarda entera."></textarea>
     <button class="btn" id="cap-boton">Capturar</button>
     <div class="error" id="cap-error" hidden></div>`
+
+  // El número llega puesto. Es una propuesta, no una imposición: el campo se
+  // edita. Pero quien atiende a un cliente no debería tener que inventar un
+  // identificador — eso es un detalle de cómo guardamos las cosas, no una
+  // decisión de su trabajo.
+  fetch('/api/siguiente-id')
+    .then(r => r.json())
+    .then(d => { if (!$('#cap-id').value) $('#cap-id').value = d.id })
+    .catch(() => { /* si falla, el campo se rellena a mano y ya está */ })
 
   $('#cap-boton').addEventListener('click', async () => {
     const id = $('#cap-id').value.trim()
@@ -408,8 +423,10 @@ function pintarCaptura () {
         $('#cap-boton').disabled = false
         return
       }
-      $('#cap-id').value = ''
       $('#cap-texto').value = ''
+      // Y el siguiente número, ya puesto para el cliente que viene detrás.
+      try { $('#cap-id').value = (await (await fetch('/api/siguiente-id')).json()).id }
+      catch { $('#cap-id').value = '' }
       await cargarLista()
       await abrirExpediente(d.id)
     } catch (e) {
@@ -539,6 +556,11 @@ async function abrirExpediente (id) {
 
     ${(ahora => ahora ? `<div class="ahora ${ahora.mio ? 'mio' : ''}">
       <b>${ahora.mio ? '→ Te toca a ti' : 'Ahora mismo'}</b> ${esc(ahora.texto)}
+      ${ahora.mio && rol() === 'oficial' && d.preguntas.length ? `
+        <ul class="pedir">
+          ${d.preguntas.filter(q => q.critico).slice(0, 3).map(q => `
+            <li>${esc(q.pregunta)}</li>`).join('')}
+        </ul>` : ''}
     </div>` : '')(queHacerAhora(e, rol()))}
 
     <div class="tarjeta">
