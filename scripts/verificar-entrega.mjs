@@ -28,34 +28,28 @@ import { join, relative, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { LISTA_NEGRA, AUTOEXCLUIDOS } from './lista-negra.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const rel = (p) => relative(RAIZ, p)
 
 /** Este archivo habla de lo que busca, así que no puede buscarse a sí mismo. */
-const AUTOEXCLUIDO = ['scripts/verificar-entrega.mjs', 'scripts/metricas.mjs']
+// `metricas.mjs` se suma a los de lista-negra.mjs porque también nombra los
+// términos al medir si están. Cada entrada es un permiso para esconder algo,
+// así que la lista se mantiene corta y cada una tiene su razón escrita.
+const AUTOEXCLUIDO = [...AUTOEXCLUIDOS, 'scripts/metricas.mjs']
 
 /**
  * Jerga interna que NO puede aparecer en el repo público.
  * Cada patrón lleva por qué está, porque una lista negra sin motivos se copia
  * mal y se amplía peor.
  */
-const LISTA_NEGRA = Object.freeze([
-  { re: /\bappcors\b/i,   por: 'nombre de la empresa: no pinta nada en este repo' },
-  { re: /\bqinbix\b/i,    por: 'producto interno' },
-  { re: /\bbraincors\b/i, por: 'producto interno' },
-  { re: /\bcorsbuild\b/i, por: 'producto interno' },
-  { re: /\bbasti[oó]n\b/i, por: 'jerga interna de organización' },
-  { re: /\bcoronel(es)?\b/i, por: 'jerga interna de organización' },
-  { re: /\btriaxis\b/i,   por: 'jerga interna' },
-  { re: /\bvibranio\b/i,  por: 'jerga interna' },
-  { re: /\bjarvisq\b/i,   por: 'proyecto de referencia ajeno al reto' },
-  // `SOVEREIGN` en mayúsculas y solo, es el protocolo interno.
-  // «Sovereign Intelligence» es el NOMBRE OFICIAL del track 03 y es legítimo.
-  { re: /\bSOVEREIGN\b(?!\s+Intelligence)/, por: 'protocolo interno (el track 03 sí puede nombrarse)' },
-  { re: /hackQVAC/,       por: 'ruta del repositorio de trabajo, que no se publica' },
-  { re: /_contextInit|_metahack|_victoryPlan/, por: 'directorios del corpus privado' }
-])
+// Se EXPORTA para que `audit-all` sanee con ella lo que publica, en vez de
+// tener su propia copia de los términos. Duplicarla hizo que audit-all.mjs
+// contuviera los literales y esta misma puerta lo señalara: dos archivos
+// distintos con la misma lista, y uno cazando al otro.
+// LISTA_NEGRA y AUTOEXCLUIDOS viven en scripts/lista-negra.mjs: los usan dos
+// scripts, y la copia que tenía cada uno terminó cazándose a sí misma.
 
 const EXTENSIONES = /\.(mjs|js|json|md|sh|html|css|txt|csv)$/
 
@@ -111,6 +105,42 @@ puerta('cero placeholders sin rellenar', () => {
   }
   return { ok: malos.length === 0, detalle: malos.join(', ') }
 }, 'un README con {{PENDIENTE}} dice que el trabajo no se terminó')
+
+puerta('los artefactos de audit/ no están caducados', () => {
+  // ── EL ARTEFACTO QUE DEMUESTRA QUE NO MAQUILLAMOS, MAQUILLADO ────────────
+  //
+  // Lo encontró el análisis de competencia, y es el peor sitio posible para
+  // tener un fallo: `audit/entrega.json` publicaba «todas_pasan: true · 12/12»
+  // mientras este mismo comando decía «NO SE ENTREGA · 1 de 14 cerradas».
+  //
+  // El código que lo genera estaba bien. Lo que fallaba es que NADA obligaba a
+  // regenerarlo: el JSON se escribió cuando había 12 puertas y todas pasaban, y
+  // se quedó ahí mientras el sistema seguía cambiando. Un artefacto de
+  // auditoría que puede quedarse viejo sin que nadie lo note no es evidencia:
+  // es una foto antigua con pie de foto nuevo.
+  //
+  // Se compara contra el commit más reciente y no contra un reloj: lo que
+  // importa no es que el artefacto sea de hoy, es que sea POSTERIOR al último
+  // cambio del código que describe.
+  const artefactos = ['entrega.json', 'metricas.json', 'invariantes.json']
+    .map(f => join(RAIZ, 'audit', f)).filter(existsSync)
+  if (!artefactos.length) return { ok: true, detalle: 'no hay artefactos que comprobar' }
+
+  let ultimoCambio
+  try {
+    ultimoCambio = new Date(execFileSync('git', ['log', '-1', '--format=%cI'],
+      { cwd: RAIZ, encoding: 'utf8' }).trim())
+  } catch { return { ok: true, detalle: 'sin git: no se puede comparar' } }
+  if (Number.isNaN(ultimoCambio.getTime())) return { ok: true, detalle: 'sin commits' }
+
+  const viejos = artefactos.filter(a => statSync(a).mtime < ultimoCambio).map(rel)
+  return {
+    ok: viejos.length === 0,
+    detalle: viejos.length
+      ? `${viejos.join(', ')} — anteriores al último commit. Corre: npm run audit:all`
+      : ''
+  }
+}, 'publicar un artefacto de auditoría que el propio comando desmiente hunde la credibilidad del resto')
 
 puerta('la declaración de base preexistente está COMPLETA', () => {
   // ── LO QUE ESTA PUERTA IMPIDE, Y ES ELIMINATORIO ─────────────────────────
@@ -216,8 +246,22 @@ puerta('el SDK instalado es el que declara package.json', () => {
             // node_modules es un enlace a otro proyecto, el mensaje «tienes la
             // 0.19.0» manda a buscar donde no está. Aquí lo era, y apuntaba
             // fuera del repositorio.
+            // ── EL DIAGNÓSTICO NO PUEDE FILTRAR LA MÁQUINA ─────────────────
+            //
+            // Esto imprimía la ruta ENTERA del enlace. Y como `audit-all`
+            // guarda la salida de este comando en `audit/entrega.json`, que es
+            // público, el artefacto acabó conteniendo una ruta absoluta de esta
+            // máquina Y el nombre de un directorio privado.
+            //
+            // Lo cazaron las puertas 1 y 2 en la misma corrida: la que busca
+            // rutas absolutas y la que busca jerga interna. Es la primera vez
+            // que las puertas se atrapan entre ellas, y es exactamente para lo
+            // que están.
+            //
+            // Ahora se dice QUÉ pasa y no DÓNDE: quien tiene el problema lo
+            // tiene delante, y quien lee el artefacto no necesita nuestra ruta.
             const donde = lstatSync(nm).isSymbolicLink()
-              ? `enlace → ${readlinkSync(nm)}`
+              ? 'un enlace a otro proyecto'
               : 'node_modules propio'
             vistos.push(`${punto} → ${v} (${donde})`)
           }

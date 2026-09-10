@@ -123,11 +123,17 @@ for (const r of resultados) {
 // ── Cobertura: ¿qué guardia NO tiene un caso que la ejercite? ───────────────
 
 const ejercitadas = new Set(resultados.flatMap(r => r.huecos.flatMap(h => h.guardias)))
-const TODAS = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8']
+// La lista es CERRADA y va aquí: si alguien añade una guardia y no la mete en
+// esta línea, el informe dirá que la cobertura está completa cuando no lo está.
+// Ya pasó con G9 y G10: existían, estaban probadas en `npm test`, y ningún caso
+// trampa las ejercitaba — mientras el README anunciaba «cobertura G1..G10».
+const TODAS = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10']
+// Ordenar por NÚMERO, no alfabéticamente: G10 iba justo detrás de G1.
+const porNumero = (a, b) => Number(a.slice(1)) - Number(b.slice(1))
 const sinCaso = TODAS.filter(g => !ejercitadas.has(g))
 
 console.log(`\n  ${B}COBERTURA DE GUARDIAS${N}`)
-console.log(`     ${V}vistas trabajando:${N} ${[...ejercitadas].sort().join(' ')}`)
+console.log(`     ${V}vistas trabajando:${N} ${[...ejercitadas].sort(porNumero).join(' ')}`)
 if (sinCaso.length) {
   console.log(`     ${A}sin caso que las ejercite:${N} ${sinCaso.join(' ')}`)
   console.log(`     ${G}una guardia sin caso es una guardia que nadie ha visto trabajar${N}`)

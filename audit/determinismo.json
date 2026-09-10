@@ -1,13 +1,13 @@
 {
   "_": "Dos corridas independientes del flujo completo. El diff tiene que estar vacío.",
   "_por_que": "Determinismo es una propiedad comprobable, no una promesa. Si dos corridas del mismo sistema con la misma entrada difieren, no es determinista, y da igual lo que diga el README.",
-  "fecha": "2026-09-10T12:37:54.286Z",
+  "fecha": "2026-09-10T16:08:23.856Z",
   "identicas": true,
   "corrida_1": {
     "ok": true,
     "expediente": "SMOKE-001",
     "estado": "VALIDADO",
-    "anclados": 4,
+    "anclados": 20,
     "huecos": 2,
     "motivos": {
       "documentos[0].emisor": "SIN_ANCLAJE",
@@ -20,7 +20,7 @@
     "ok": true,
     "expediente": "SMOKE-001",
     "estado": "VALIDADO",
-    "anclados": 4,
+    "anclados": 20,
     "huecos": 2,
     "motivos": {
       "documentos[0].emisor": "SIN_ANCLAJE",

@@ -715,6 +715,147 @@
           "titular.cedula"
         ]
       }
+    },
+    {
+      "id": "C16",
+      "titulo": "⭐ DOS DOCUMENTOS RECLAMAN LA MISMA PALABRA — atribución cruzada",
+      "medido": false,
+      "guardia": "G9",
+      "$por_que": "La cita del segundo documento es literal y G3 la acepta con razón: está ahí. Pero «IDAAN» aparece UNA vez en la fuente, y el recibo ya la reclamó. Dos documentos distintos no pueden sacar su emisor de la misma palabra: uno de los dos miente, y saber cuál es aritmética de índices, no interpretación. Se marca el POSTERIOR, no los dos: marcar ambos deja al oficial sin nada.",
+      "fuente": "El titular es Ana Ruiz, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas y una carta laboral.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Ana Ruiz",
+            "cita": "El titular es Ana Ruiz"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "cédula 8-123-456"
+          }
+        },
+        "operacion": {
+          "producto": {
+            "valor": "cuenta de ahorros",
+            "cita": "el producto cuenta de ahorros"
+          },
+          "tipo_transaccion": {
+            "valor": "depósito en efectivo",
+            "cita": "tipo de transacción depósito en efectivo"
+          },
+          "monto_transaccional": {
+            "valor": 800.0,
+            "cita": "monto transaccional estimado de 800.00 balboas"
+          },
+          "frecuencia": {
+            "valor": "mensual",
+            "cita": "frecuencia mensual"
+          },
+          "canal": {
+            "valor": "sucursal",
+            "cita": "canal de sucursal"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 45.3,
+              "cita": "por 45.30 balboas"
+            }
+          },
+          {
+            "tipo": "CARTA_LABORAL",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Presenta el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[1].emisor"
+        ],
+        "conserva": [
+          "documentos[0].emisor"
+        ]
+      }
+    },
+    {
+      "id": "C17",
+      "titulo": "⭐ LA CITA SALTA DE FRASE — la fecha es de otro documento",
+      "medido": false,
+      "guardia": "G10",
+      "$por_que": "Cita cien por cien literal, y sin embargo presta al recibo del IDAAN una fecha que la fuente le dio a la carta laboral. Entre las dos hay un punto. Se eligió esta regla en vez de un límite de longitud porque un límite es un número que no sabríamos defender; esto no tiene número: o cruza el punto o no. En una frase: una cita que salta de una frase a otra no está citando, está construyendo.",
+      "fuente": "El titular es Ana Ruiz, cédula 8-123-456. Presenta el recibo del IDAAN. La carta laboral fue emitida el 20 de agosto de 2026.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Ana Ruiz",
+            "cita": "El titular es Ana Ruiz"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "cédula 8-123-456"
+          }
+        },
+        "operacion": {
+          "producto": {
+            "valor": "cuenta de ahorros",
+            "cita": "el producto cuenta de ahorros"
+          },
+          "tipo_transaccion": {
+            "valor": "depósito en efectivo",
+            "cita": "tipo de transacción depósito en efectivo"
+          },
+          "monto_transaccional": {
+            "valor": 800.0,
+            "cita": "monto transaccional estimado de 800.00 balboas"
+          },
+          "frecuencia": {
+            "valor": "mensual",
+            "cita": "frecuencia mensual"
+          },
+          "canal": {
+            "valor": "sucursal",
+            "cita": "canal de sucursal"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "el recibo del IDAAN. La carta laboral fue emitida el 20 de agosto de 2026"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].fecha_emision"
+        ],
+        "conserva": [
+          "documentos[0].emisor"
+        ]
+      }
     }
   ]
 }

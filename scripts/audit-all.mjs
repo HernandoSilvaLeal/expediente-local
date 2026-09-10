@@ -24,6 +24,7 @@ import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { cpus, totalmem, freemem, platform, release, arch, hostname } from 'node:os'
+import { LISTA_NEGRA } from './lista-negra.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const AUDIT = join(RAIZ, 'audit')
@@ -244,9 +245,45 @@ guardar('entrega.json', {
   _: 'Las puertas eliminatorias. Cada una anula el trabajo entero por sí sola.',
   fecha: new Date().toISOString(),
   todas_pasan: ent.ok,
-  salida: ent.salida.replace(/\x1b\[[0-9;]*m/g, '').trim(),
+  salida: sanear(ent.salida),
   comando: 'npm run verify:entrega'
 })
+
+/**
+ * Quita de la salida lo que no puede viajar a un archivo público.
+ *
+ * ── EL BUCLE QUE OBLIGÓ A ESCRIBIR ESTO ──────────────────────────────────
+ *
+ * Este archivo guarda la salida de `verificar-entrega`. Cuando una puerta
+ * FALLA, su diagnóstico nombra lo que encontró — una ruta, un término de la
+ * lista negra. Al guardarlo, el artefacto pasaba a contener eso mismo, y en la
+ * corrida siguiente **las puertas se encontraban a sí mismas**: la de jerga
+ * interna señalaba `audit/entrega.json` por contener la palabra que ella misma
+ * había escrito ahí.
+ *
+ * Ya nos pasó antes con `audit-all` analizándose a sí mismo. Es el mismo
+ * animal: un verificador que produce el artefacto que después verifica.
+ *
+ * La salida NO se recorta ni se maquilla —el veredicto y el nombre de cada
+ * puerta viajan enteros—; lo que se sustituye es el dato concreto, dejando la
+ * marca de que había algo. Quien tenga el problema lo ve en su terminal, que es
+ * donde importa.
+ */
+function marcarLinea (linea) {
+  // Se conserva la sangría y el sentido: se pierde solo el dato concreto.
+  const sangria = linea.match(/^\s*/)[0]
+  return `${sangria}‹detalle omitido: contenía un término que no se publica›`
+}
+
+function sanear (salida) {
+  return salida
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .replace(/\/(?:home|Users|root)\/[^\s"'`)]*/g, '‹ruta local omitida›')
+    .split('\n')
+    .map(l => LISTA_NEGRA.some(({ re }) => re.test(l)) ? marcarLinea(l) : l)
+    .join('\n')
+    .trim()
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  7 · inference_log.csv — NO MEDIDO, y se dice
