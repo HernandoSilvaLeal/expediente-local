@@ -154,6 +154,52 @@ puerta('los artefactos de audit/ no están caducados', () => {
   }
 }, 'publicar un artefacto de auditoría que el propio comando desmiente hunde la credibilidad del resto')
 
+puerta('la definición del problema sigue describiendo el sistema', () => {
+  // ── UN DOCUMENTO DE PROBLEMA QUE ENVEJECE ES PEOR QUE NO TENERLO ─────────
+  //
+  // `docs/PROBLEMA.md` afirma cosas concretas sobre el sistema: cuántas formas
+  // de colar un dato falso hay cubiertas, y qué proporción del código es
+  // determinista. Si el sistema cambia y el documento no, pasa a ser una pieza
+  // de marketing con aspecto de análisis.
+  //
+  // Es el mismo fallo que ya tuvimos con `audit/entrega.json` publicando 12/12
+  // mientras el comando decía lo contrario. La contramedida es la misma:
+  // comprobar la afirmación contra la fuente, no contra la memoria.
+  const doc = join(RAIZ, 'docs/PROBLEMA.md')
+  if (!existsSync(doc)) return { ok: false, detalle: 'no existe docs/PROBLEMA.md' }
+  const texto = readFileSync(doc, 'utf8')
+
+  const malos = []
+
+  // Se cuentan las FILAS de la tabla, no el número escrito en la cabecera: en
+  // un documento que se lee, «diecisiete» va en letra, y comprobar la letra
+  // sería comprobar la ortografía en vez del contenido. Las filas numeradas son
+  // la afirmación de verdad.
+  const filas = (texto.match(/^\|\s*\d+\s*\|/gm) ?? []).length
+  try {
+    const casos = JSON.parse(readFileSync(join(RAIZ, 'instancias/banca/seed/casos.json'), 'utf8')).casos.length
+    // El banco tiene un caso que es el camino feliz: no es una forma de colar
+    // nada, así que la tabla del problema tiene uno menos.
+    if (filas < casos - 1) {
+      malos.push(`la tabla lista ${filas} formas y el banco de casos cubre ${casos - 1}`)
+    }
+  } catch { malos.push('no se pudo leer el banco de casos') }
+
+  // Y la proporción determinista, que también se afirma con número.
+  const pct = /(\d+[,.]\d+)\s*%\s*del sistema es c[oó]digo/i.exec(texto)?.[1]?.replace(',', '.')
+  if (pct) {
+    try {
+      const m = JSON.parse(execFileSync('node', ['scripts/metricas.mjs', '--json'],
+        { cwd: RAIZ, encoding: 'utf8', timeout: 30000 }))
+      if (Math.abs(Number(pct) - m.proporcion.porcentajeDeterminista) > 0.1) {
+        malos.push(`dice ${pct} % determinista y la medida es ${m.proporcion.porcentajeDeterminista} %`)
+      }
+    } catch { /* si metricas falla, ya lo dice otra puerta */ }
+  }
+
+  return { ok: malos.length === 0, detalle: malos.join(' · ') }
+}, 'un documento que explica el problema con números viejos es marketing con aspecto de análisis')
+
 puerta('la declaración de base preexistente está COMPLETA', () => {
   // ── LO QUE ESTA PUERTA IMPIDE, Y ES ELIMINATORIO ─────────────────────────
   //

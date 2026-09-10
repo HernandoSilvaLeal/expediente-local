@@ -25,6 +25,10 @@ el núcleo importa el SDK.
 
 > **¿Primera vez aquí y no eres técnico?** → **[EMPIEZA-AQUI.md](EMPIEZA-AQUI.md)**,
 > cuatro pasos y una pantalla.
+>
+> **¿Quieres el problema a fondo?** → **[docs/PROBLEMA.md](docs/PROBLEMA.md)**, con
+> sus dos caras: qué se rompe en un banco y quién lo sufre, y por qué un modelo
+> de lenguaje no puede arreglarlo solo.
 
 | | |
 |---|---|
