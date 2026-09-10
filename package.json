@@ -9,6 +9,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "start": "node ui/servidor.mjs",
     "setup": "node scripts/setup.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test": "node --test pruebas/*.test.mjs",

@@ -1,0 +1,19 @@
+{
+  "_": "Medición del clon limpio. Es el número que contesta '¿se puede reproducir?' sin adjetivos.",
+  "fecha": "2026-09-10T05:20:00Z",
+  "metodo": "HOME nuevo (sin caché de npm), git clone desde la URL pública, npm ci, y las cuatro verificaciones",
+  "pasos": {
+    "git_clone_s": 2,
+    "npm_ci_s": 190,
+    "npm_test_s": 1,
+    "total_s": 193
+  },
+  "resultados": {
+    "tests": "267/267",
+    "frontera_95_5": "intacta",
+    "smoke": "OK, JSON válido",
+    "puertas_de_entrega": "11/11 PASS"
+  },
+  "hallazgo": "Esta medición cazó que FALTABA package-lock.json en el repositorio. El README manda `npm ci`, que sin lockfile falla con EUSAGE: un juez siguiendo el README se estrellaba en el paso 2. Corregido en el commit anterior a esta medición.",
+  "nota": "190 s de los 193 son la descarga del SDK sin caché. En una máquina que ya tenga caché de npm, el número es mucho menor — y por eso se publica el caso PEOR, no el mejor."
+}

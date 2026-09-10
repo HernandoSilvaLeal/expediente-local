@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expediente Local</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sin framework, sin build, sin una sola petición a internet.
+   Que se pueda comprobar en la pestaña de red del navegador es parte
+   del argumento del proyecto, no una anécdota.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --fondo:#0F1722; --panel:#16202D; --borde:#243244; --linea:#1C2735;
+  --texto:#E6EDF5; --tenue:#8FA3BC; --apagado:#5B6E86;
+  --mint:#09D9C4; --sky:#4EA8FF; --gold:#F0B429; --coral:#FF6B5A;
+
+  /* LOS CUATRO GRADOS DE EVIDENCIA.
+     Es el único elemento de la interfaz que argumenta a favor de Technical sin
+     decir una palabra: un jurado entiende la escala sin que nadie se la explique.
+     Los cuatro pasan AA sobre --panel (contraste ≥ 4,5:1). El color NUNCA va
+     solo: cada badge lleva su forma y su texto, porque uno de cada doce hombres
+     no distingue rojo de verde y un dato de banca no puede depender de eso. */
+  --ev-confirmado:#3DDC97;   /* ● lleno   — la fuente lo afirma explícitamente */
+  --ev-reportado: #4EA8FF;   /* ● lleno   — afirmación llana                   */
+  --ev-estimado:  #F0B429;   /* ◐ medio   — la fuente atenúa: "parece", "unos" */
+  --ev-desconocido:#7D8FA6;  /* ○ vacío   — no entró, y se dice por qué        */
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--fondo); color:var(--texto);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+header{
+  padding:18px 24px; border-bottom:1px solid var(--borde);
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+}
+header h1{margin:0; font-size:17px; letter-spacing:.2px}
+header .lema{color:var(--tenue); font-size:13px}
+header .dominio{
+  margin-left:auto; color:var(--mint); font-size:12px;
+  border:1px solid var(--mint); border-radius:99px; padding:2px 10px;
+}
+
+main{display:grid; grid-template-columns:300px 1fr; gap:0; min-height:calc(100vh - 61px)}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+
+aside{border-right:1px solid var(--borde); padding:16px; overflow:auto}
+aside h2,section h2{
+  font-size:11px; text-transform:uppercase; letter-spacing:1.2px;
+  color:var(--apagado); margin:0 0 10px; font-weight:600;
+}
+
+.exp{
+  border:1px solid var(--borde); border-radius:8px; padding:10px 12px;
+  margin-bottom:8px; cursor:pointer; background:var(--panel);
+  transition:border-color .15s ease;      /* LA ÚNICA animación de la interfaz */
+}
+.exp:hover,.exp[aria-current="true"]{border-color:var(--mint)}
+.exp .id{font-weight:600; font-size:13px}
+.exp .meta{color:var(--tenue); font-size:12px; margin-top:3px}
+
+section{padding:20px 24px; overflow:auto}
+
+.tarjeta{background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:16px; margin-bottom:16px}
+.tarjeta.hueco{border-color:#4A2F30; background:#1B1618}
+
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{text-align:left; color:var(--apagado); font-weight:600; font-size:11px;
+   text-transform:uppercase; letter-spacing:.8px; padding:0 8px 8px 0}
+td{padding:7px 8px 7px 0; border-top:1px solid var(--linea); vertical-align:top}
+td.ruta{color:var(--tenue); white-space:nowrap; width:1%}
+.cita{color:var(--apagado); font-size:12.5px; font-style:italic; margin-top:3px}
+
+/* El badge lleva SIEMPRE forma + color + texto. Nunca solo color. */
+.ev{display:inline-flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap}
+.ev::before{font-size:11px; line-height:1}
+.ev-Confirmado{color:var(--ev-confirmado)}   .ev-Confirmado::before{content:"●"}
+.ev-Reportado{color:var(--ev-reportado)}     .ev-Reportado::before{content:"●"}
+.ev-Estimado{color:var(--ev-estimado)}       .ev-Estimado::before{content:"◐"}
+.ev-Desconocido{color:var(--ev-desconocido)} .ev-Desconocido::before{content:"○"}
+
+.estado{display:inline-block; font-size:11px; letter-spacing:.6px; padding:3px 9px;
+        border-radius:99px; border:1px solid currentColor}
+.e-APROBADO{color:var(--ev-confirmado)} .e-COMPLETO{color:var(--mint)}
+.e-VALIDADO{color:var(--sky)}           .e-EXTRAIDO,.e-CAPTURADO{color:var(--gold)}
+.e-RECHAZADO,.e-DESCARTADO{color:var(--coral)} .e-DUPLICADO{color:var(--apagado)}
+
+.guardia{color:var(--coral); font-size:11px; border:1px solid var(--coral);
+         border-radius:4px; padding:1px 5px; margin-right:4px}
+.motivo{color:var(--tenue); font-size:12px}
+
+.barra{height:5px; background:var(--linea); border-radius:99px; overflow:hidden; margin-top:6px}
+.barra > i{display:block; height:100%; background:var(--mint)}
+
+.aviso{color:var(--tenue); font-size:13px; padding:10px 0}
+.hechos{font-size:12px; color:var(--tenue); max-height:220px; overflow:auto}
+.hechos div{padding:2px 0; border-top:1px solid var(--linea)}
+.cadena-ok{color:var(--ev-confirmado)} .cadena-rota{color:var(--coral)}
+pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
+    padding:12px; overflow:auto; font-size:12px; max-height:320px}
+.pregunta{border-left:2px solid var(--gold); padding-left:12px; margin:10px 0}
+.pregunta b{color:var(--gold); font-weight:600; font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Expediente&nbsp;Local</h1>
+  <span class="lema">el modelo propone · el código decide · una persona aprueba</span>
+  <span class="dominio" id="dominio">—</span>
+</header>
+
+<main>
+  <aside>
+    <h2>Expedientes</h2>
+    <div id="lista"><p class="aviso">cargando…</p></div>
+    <h2 style="margin-top:20px">Leyenda</h2>
+    <div style="display:grid;gap:5px">
+      <span class="ev ev-Confirmado">Confirmado — la fuente lo afirma</span>
+      <span class="ev ev-Reportado">Reportado — afirmación llana</span>
+      <span class="ev ev-Estimado">Estimado — la fuente atenúa</span>
+      <span class="ev ev-Desconocido">Desconocido — no entró</span>
+    </div>
+  </aside>
+
+  <section id="detalle">
+    <p class="aviso">Elige un expediente. Si no hay ninguno, créalo con:<br>
+      <code class="mono">node cli.mjs revisar --texto "…" --extraccion x.json</code></p>
+  </section>
+</main>
+
+<script>
+const $ = (s, d = document) => d.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+
+async function cargarLista () {
+  const r = await fetch('/api/expedientes')
+  const d = await r.json()
+  $('#dominio').textContent = d.esquema.dominio + ' / ' + d.esquema.entidad
+
+  if (!d.expedientes.length) {
+    $('#lista').innerHTML = '<p class="aviso">todavía no hay expedientes</p>'
+    return
+  }
+  $('#lista').innerHTML = d.expedientes.map(e => `
+    <div class="exp" data-id="${esc(e.id)}" role="button" tabindex="0">
+      <div class="id">${esc(e.id)} <span class="estado e-${esc(e.estado)}">${esc(e.estado)}</span></div>
+      <div class="meta">${e.anclados} anclados · ${e.huecos} huecos${e.duplicadoDe ? ' · dup. de ' + esc(e.duplicadoDe) : ''}</div>
+      <div class="barra"><i style="width:${Math.round(e.completitud * 100)}%"></i></div>
+    </div>`).join('')
+
+  for (const el of document.querySelectorAll('.exp')) {
+    const abrir = () => abrirExpediente(el.dataset.id)
+    el.addEventListener('click', abrir)
+    el.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrir() } })
+  }
+  abrirExpediente(d.expedientes[0].id)
+}
+
+async function abrirExpediente (id) {
+  for (const el of document.querySelectorAll('.exp')) {
+    el.setAttribute('aria-current', String(el.dataset.id === id))
+  }
+  const d = await (await fetch('/api/expediente/' + encodeURIComponent(id))).json()
+  if (d.error) { $('#detalle').innerHTML = '<p class="aviso">' + esc(d.error) + '</p>'; return }
+
+  const e = d.expediente
+  const campos = Object.entries(e.campos)
+  const huecos = Object.entries(e.huecos || {})
+
+  $('#detalle').innerHTML = `
+    <h2>${esc(e.id)} · <span class="estado e-${esc(e.estado)}">${esc(e.estado)}</span></h2>
+
+    <div class="tarjeta">
+      <h2>Lo que entró al expediente</h2>
+      <p class="aviso" style="padding-top:0">cada valor con la cita literal que lo sostiene</p>
+      ${campos.length ? `<table>
+        <tr><th>Campo</th><th>Valor</th><th>Evidencia</th></tr>
+        ${campos.map(([ruta, c]) => `
+          <tr>
+            <td class="ruta mono">${esc(ruta)}</td>
+            <td><b>${esc(c.valor)}</b>${c.cita ? `<div class="cita">«${esc(c.cita)}»</div>` : ''}</td>
+            <td><span class="ev ev-${esc(c.evidencia)}">${esc(c.evidencia)}</span></td>
+          </tr>`).join('')}
+      </table>` : '<p class="aviso">ningún campo ancló todavía</p>'}
+    </div>
+
+    ${huecos.length ? `<div class="tarjeta hueco">
+      <h2>Lo que NO entró, y por qué</h2>
+      <p class="aviso" style="padding-top:0">un hueco explicado vale más que un dato inventado</p>
+      <table>
+        ${huecos.map(([ruta, h]) => `
+          <tr>
+            <td class="ruta mono">${esc(ruta)}</td>
+            <td>${h.guardias.map(g => `<span class="guardia">${esc(g)}</span>`).join('')}
+                <span class="motivo">${esc(h.motivos.join(', '))}</span></td>
+          </tr>`).join('')}
+      </table>
+    </div>` : ''}
+
+    ${d.preguntas.length ? `<div class="tarjeta">
+      <h2>Qué preguntar, y en qué orden</h2>
+      <p class="aviso" style="padding-top:0">lo decide una regla sobre el esquema. Cero IA</p>
+      ${d.preguntas.slice(0, 4).map(p => `
+        <div class="pregunta">
+          <b>${esc(p.critico ? 'CRÍTICO' : 'opcional')} · ${esc(p.ruta)}</b>
+          <div>${esc(p.pregunta)}</div>
+          <div class="motivo">${esc(p.detalle)}</div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <div class="tarjeta">
+      <h2>El registro de hechos</h2>
+      <p class="${d.cadena.intacta ? 'cadena-ok' : 'cadena-rota'}" style="margin:0 0 8px">
+        ${d.cadena.intacta
+          ? '✓ cadena íntegra — ' + d.cadena.eventos + ' hechos encadenados por hash, ninguno alterado'
+          : '✗ CADENA ROTA en el hecho #' + d.cadena.rotoEn + ' — ' + esc(d.cadena.causa)}
+      </p>
+      <div class="hechos mono">
+        ${d.hechos.map(h => `<div>#${String(h.seq).padStart(3)} ${esc(h.ts.slice(11, 19))}
+          ${esc(h.tipo)} <span style="color:var(--apagado)">${esc(h.origen)}${h.motivo ? ' · ' + esc(h.motivo) : ''}</span></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Dataset exportable · con columna de auditoría</h2>
+      <pre>${esc(d.csv)}</pre>
+    </div>`
+}
+
+cargarLista()
+</script>
+</body>
+</html>

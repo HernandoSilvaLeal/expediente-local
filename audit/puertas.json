@@ -3,7 +3,7 @@
   "_regla": "Si una casilla se puede verificar por comando, NO va aquí: va medida en scripts/metricas.mjs. Meter aquí algo medible es hacerse trampa al solitario.",
   "_como": "Poner true SOLO después de ejecutar el comando de la casilla y ver el resultado con los propios ojos. La fecha va en _bitacora.",
   "bronce_sin_red": true,
-  "bronce_readme_instalacion": false,
+  "bronce_readme_instalacion": true,
   "plata_casos_crudo": false,
   "plata_audit_all": false,
   "oro_p2p_fisico": false,
@@ -13,13 +13,14 @@
   "desc_video_duracion": false,
   "desc_video_acceso": false,
   "desc_repo_publico": false,
-  "desc_clon_limpio": false,
+  "desc_clon_limpio": true,
   "desc_formulario": false,
   "_bitacora": {
     "oro_p2p_fisico": "10-sep 00:0x — MAL MEDIDO, HAY QUE REPETIRLO. Lo observado: los dos pares se anuncian y no se encuentran; TCP pasa (SSH funciona) y UDP no llegó en una prueba directa; cortafuegos descartado (reglas en Any). Se concluyó 'aislamiento de clientes en el TP-Link' a partir de una firma de 18,2 s constantes de anuncio contra 0,1 s en loopback. LA CONCLUSION ERA PREMATURA: el ejemplo oficial que trae el propio paquete (dist/examples/delegated-inference/consumer.js) dice literal que arrancar hyperdht y localizar la clave del proveedor tarda 15-45 s en la PRIMERA corrida. 18,2 s esta DENTRO de lo esperado, y nuestro watchdog de 25 s estaba abortando a la mitad del rango normal. Que hacer: subir el watchdog a 90 s, y probar ademas la segunda via, que es startQVACProvider (hyperswarm propio del SDK, otra pila que puede atravesar donde la nuestra no). Lo que sigue sin explicacion y sigue en pie: el paquete UDP que no llego.",
     "_leccion": "Se interpreto un numero como sintoma de averia sin buscar antes cual era el valor esperado. El valor esperado estaba escrito en un comentario dentro del paquete que ya teniamos instalado.",
     "bronce_sin_red": "10-sep 00:1x — MEDIDO. `unshare -rn bash -c 'node scripts/smoke.mjs'`: dentro del espacio de red, `ip link` muestra solo `lo: DOWN`, `curl` a npmjs devuelve codigo HTTP 000, y el smoke recorre el flujo completo y sale con JSON valido y codigo 0. Es el plano B del video.",
-    "oro_delegacion": "10-sep 00:2x — MEDIO PROBADA. El PROVEEDOR arranca de verdad contra @qvac/sdk 0.18.2 en esta maquina: startQVACProvider devolvio clave publica en 8.419 ms. Es media delegacion: falta la otra mitad, que es un consumidor conectandose y recibiendo inferencia. Hasta que eso este grabado, se escribe NO MEDIDO."
+    "oro_delegacion": "10-sep 00:2x — MEDIO PROBADA. El PROVEEDOR arranca de verdad contra @qvac/sdk 0.18.2 en esta maquina: startQVACProvider devolvio clave publica en 8.419 ms. Es media delegacion: falta la otra mitad, que es un consumidor conectandose y recibiendo inferencia. Hasta que eso este grabado, se escribe NO MEDIDO.",
+    "clon_limpio": "10-sep 00:2x — MEDIDO en clon limpio con HOME nuevo, sin cache de npm. clone 2 s + npm ci 190 s = 192 s, y de ahi: 267/267 tests, frontera intacta, smoke OK y 11/11 puertas de entrega. TOTAL DE CERO A FUNCIONANDO: 193 s (3 min 13 s). Y cazo el fallo que buscaba: FALTABA package-lock.json, asi que 'npm ci' —lo que manda el README— reventaba con EUSAGE. Un juez siguiendo el README se estrellaba en el paso 2."
   },
   "_promovidas": "desc_base_preexistente, desc_sin_rutas_absolutas y desc_sin_placeholders salieron de este archivo el 10-sep: ahora las verifica scripts/verificar-entrega.mjs y son casillas MEDIDAS. Mover casillas en esa direccion es el unico progreso real del tablero. El movimiento contrario, nunca."
 }

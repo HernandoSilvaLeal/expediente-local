@@ -74,11 +74,12 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **247 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **267 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
-| Que nada descalifica | `node scripts/verificar-entrega.mjs` | 9 puertas, cada una eliminatoria |
+| Que nada descalifica | `npm run verify:entrega` | **11 puertas**, cada una eliminatoria |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
+| **La interfaz** | `npm start` → http://127.0.0.1:7301 | cero dependencias, cero build |
 
 **El flujo completo, sin modelo:**
 
@@ -124,15 +125,33 @@ node cli.mjs aprobar --ledger /tmp/demo/e.jsonl --texto "confío"
 git clone https://github.com/HernandoSilvaLeal/expediente-local
 cd expediente-local
 
-# 2 · Dependencias                                 (~50 s con red buena, 204 paquetes)
+# 2 · Dependencias                                 (190 s SIN caché · 217 paquetes)
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
-# 3 · Modelos                                      (pendiente de cronometrar)
-npm run setup             # descarga los pesos y verifica su SHA-256
+# 3 · Comprobar que funciona                       (1 s)
+npm test                  # 267 tests, sin modelo y sin red
+npm run smoke             # el flujo completo. Sale JSON y código 0
 
-# 4 · Comprobar que funciona
-npm run smoke             # el flujo completo. Debe salir JSON y código 0
+# 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
+npm run setup             # descarga los pesos por registry://
 ```
+
+### 🔵 De cero a funcionando: **3 min 13 s**
+
+Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde la URL pública:
+
+| Paso | Tiempo |
+|---|---|
+| `git clone` | 2 s |
+| `npm ci` (217 paquetes, sin caché) | 190 s |
+| `npm test` → **267/267** | 1 s |
+| **TOTAL** | **193 s** |
+
+Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **11/11 puertas
+de entrega en PASS**. El detalle está en [`audit/clon-limpio.json`](audit/clon-limpio.json).
+
+> Se publica el caso **peor**: 190 de los 193 segundos son la descarga sin caché. En una
+> máquina que ya tenga caché de npm es mucho menos.
 
 **Requisito:** Node.js ≥ 20. **GPU opcional** — el sistema corre en CPU pura, más lento.
 
@@ -185,12 +204,12 @@ sobre inventario hospitalario, sin tocar una línea de `core/`.
 
 | | |
 |---|---|
-| Tests | **247 / 247** verdes, sin modelo y sin red |
-| De ellos, prueban que algo **NO** se puede | **153** (62 %) |
+| Tests | **267 / 267** verdes, sin modelo y sin red |
+| De ellos, prueban que algo **NO** se puede | **165** (62 %) |
 | Casos de uso de sucursal, punta a punta | **14** |
-| Módulos deterministas / que tocan un modelo | **12 / 1** → **92,3 %** |
+| Módulos deterministas / que tocan un modelo | **16 / 1** → **94,1 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
-| Puertas de entrega en PASS | **9 / 9** |
+| Puertas de entrega en PASS | **11 / 11** |
 
 ### ⚫ Lo que NO está medido
 
@@ -200,7 +219,8 @@ usted no lo pongo**:
 - **Inferencia delegada entre dos máquinas físicas.** El proveedor arranca y emite su clave
   pública en 8.419 ms, y su identidad es reproducible entre corridas. **Un consumidor conectándose
   y recibiendo inferencia de vuelta todavía NO se ha medido.**
-- **Tiempo de instalación completa en máquina limpia**, incluidos los pesos.
+- **Tiempo de descarga de los pesos.** El clon limpio SÍ está medido (3 min 13 s hasta tener
+  el sistema corriendo), pero `npm run setup` todavía no se ha cronometrado.
 - **OCR sobre fotografías reales.** Lo probado hasta ahora es imagen sintética.
 
 ---
