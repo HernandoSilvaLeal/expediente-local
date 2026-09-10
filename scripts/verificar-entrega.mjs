@@ -130,6 +130,20 @@ puerta('todas las dependencias declaradas están fijadas', () => {
   return { ok: sueltas.length === 0, detalle: sueltas.join(', ') }
 }, 'un ^ resuelve a otra versión en la máquina del juez. Nosotros necesitamos 0.18.2 EXACTA')
 
+puerta('todo `npm run` apunta a un archivo que existe', () => {
+  // Un comando prometido en el README que revienta con ENOENT delante de quien
+  // evalúa vale menos que no haberlo prometido. `npm run setup` apuntaba a un
+  // scripts/setup.sh que no existía, y `start` y `audit:all` igual.
+  const pkg = JSON.parse(readFileSync(join(RAIZ, 'package.json'), 'utf8'))
+  const rotos = []
+  for (const [nombre, cmd] of Object.entries(pkg.scripts ?? {})) {
+    for (const m of String(cmd).matchAll(/(?:^|\s)((?:scripts|ui|core|ia|malla)\/[\w./-]+\.(?:mjs|js|sh))/g)) {
+      if (!existsSync(join(RAIZ, m[1]))) rotos.push(`${nombre} → ${m[1]}`)
+    }
+  }
+  return { ok: rotos.length === 0, detalle: rotos.join(', ') }
+}, 'un npm run que revienta con ENOENT delante del jurado vale menos que no prometerlo')
+
 puerta('los tests deterministas pasan', () => {
   try {
     execFileSync('npm', ['test'], { cwd: RAIZ, stdio: 'ignore', timeout: 180_000 })
