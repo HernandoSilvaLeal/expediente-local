@@ -24,6 +24,7 @@
   "desc_formulario": false,
 
   "_bitacora": {
-    "oro_p2p_fisico": "9-sep 23:0x — DIAGNOSTICADO, NO LOGRADO. Los dos pares se anuncian y no se encuentran. TCP pasa (SSH funciona), UDP no llega: paquete enviado desde el portátil, cero recibidos en la torre. Cortafuegos descartado (reglas en Any). Causa probable: aislamiento de clientes en el repetidor TP-Link. Firma: 18,2 s constantes de anuncio contra 0,1 s en loopback. Salida pendiente: hotspot del celular."
+    "oro_p2p_fisico": "10-sep 00:0x — MAL MEDIDO, HAY QUE REPETIRLO. Lo observado: los dos pares se anuncian y no se encuentran; TCP pasa (SSH funciona) y UDP no llegó en una prueba directa; cortafuegos descartado (reglas en Any). Se concluyó 'aislamiento de clientes en el TP-Link' a partir de una firma de 18,2 s constantes de anuncio contra 0,1 s en loopback. LA CONCLUSION ERA PREMATURA: el ejemplo oficial que trae el propio paquete (dist/examples/delegated-inference/consumer.js) dice literal que arrancar hyperdht y localizar la clave del proveedor tarda 15-45 s en la PRIMERA corrida. 18,2 s esta DENTRO de lo esperado, y nuestro watchdog de 25 s estaba abortando a la mitad del rango normal. Que hacer: subir el watchdog a 90 s, y probar ademas la segunda via, que es startQVACProvider (hyperswarm propio del SDK, otra pila que puede atravesar donde la nuestra no). Lo que sigue sin explicacion y sigue en pie: el paquete UDP que no llego. Detalle completo en _contextInit/01_qvac_sdk/verificado/SDK_0182_VERIFICADO_EN_MAQUINA.md",
+    "_leccion": "Se interpreto un numero como sintoma de averia sin buscar antes cual era el valor esperado. El valor esperado estaba escrito en un comentario dentro del paquete que ya teniamos instalado."
   }
 }
