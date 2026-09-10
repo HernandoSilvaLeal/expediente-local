@@ -644,3 +644,58 @@ test('UI-37 · ⭐ no se lee cualquier .jsonl del disco', async () => {
   // Y lo legítimo sigue pasando.
   assert.equal((await fetch(`${BASE}/api/expediente/EXP-001`)).status, 200)
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-10 · QUE SE ENTIENDA SIN QUE NADIE LO EXPLIQUE
+//
+//  Si hay que explicar la pantalla de palabra, la pantalla está mal. Y en una
+//  ponencia no hay nadie al lado del jurado para traducir.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-38 · ⭐ quien llega sin rol sabe qué hacer', async () => {
+  // Sin rol no se ve ni el formulario de captura ni el panel de firma, y antes
+  // tampoco se decía por qué: una pantalla que solo deja mirar, sin una palabra.
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /Elige tu rol/)
+  // Y explica los tres, porque el control dual es el argumento, no un detalle.
+  for (const rol of ['oficial de cuenta', 'gerente de sucursal', 'auditoría interna']) {
+    assert.ok(html.includes(rol), `falta explicar ${rol}`)
+  }
+})
+
+test('UI-39 · la jerga se traduce, y el código queda al lado', async () => {
+  // VALIDADO, G3, SIN_ANCLAJE son buenos nombres de sistema: cortos y
+  // auditables. Pero un oficial no tiene por qué aprender el vocabulario de
+  // nadie para trabajar. Se enseñan las dos cosas.
+  const html = await (await fetch(`${BASE}/`)).text()
+  assert.match(html, /ESTADO_HUMANO/)
+  assert.match(html, /GUARDIA_HUMANA/)
+  assert.match(html, /listo para firmar/, 'COMPLETO en lenguaje de persona')
+  assert.match(html, /esa frase no aparece en el documento/, 'G3 en lenguaje de persona')
+  assert.match(html, /class="codigo"/, 'y el código del sistema, al lado')
+})
+
+test('UI-40 · ⭐ «qué hacer ahora» cambia según quién mire', async () => {
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+
+  const ini = js.indexOf('function queHacerAhora')
+  assert.ok(ini > -1, 'la función tiene que existir')
+  const fin = js.indexOf('\n}', js.indexOf('return null', ini)) + 2
+  const queHacerAhora = new Function(js.slice(ini, fin) + '; return queHacerAhora')()
+
+  // Un conflicto lo resuelve la oficial, no el gerente. Y la pantalla lo dice
+  // ANTES de que nadie pulse un botón que su rol no permite y reciba un 403
+  // que parece una avería.
+  const enConflicto = { estado: 'COMPLETO', conflictos: [{}] }
+  assert.equal(queHacerAhora(enConflicto, 'oficial').mio, true)
+  assert.equal(queHacerAhora(enConflicto, 'aprobador').mio, false)
+
+  // Y al revés con la firma.
+  const listo = { estado: 'COMPLETO', conflictos: [] }
+  assert.equal(queHacerAhora(listo, 'aprobador').mio, true)
+  assert.equal(queHacerAhora(listo, 'oficial').mio, false)
+
+  // Un expediente firmado no le toca a nadie.
+  assert.equal(queHacerAhora({ estado: 'APROBADO', conflictos: [] }, 'aprobador').mio, false)
+})

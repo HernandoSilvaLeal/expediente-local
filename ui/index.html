@@ -140,7 +140,11 @@ td.ruta{color:var(--tenue); white-space:nowrap; width:1%}
 .e-RECHAZADO,.e-DESCARTADO{color:var(--coral)} .e-DUPLICADO{color:var(--apagado)}
 
 .guardia{color:var(--coral); font-size:11px; border:1px solid var(--coral);
-         border-radius:4px; padding:1px 5px; margin-right:4px}
+         border-radius:4px; padding:1px 5px; margin-right:4px; cursor:help}
+/* El código del sistema, en gris y pequeño: quien lo necesite para un informe
+   lo tiene; quien solo quiera trabajar, no tropieza con él. */
+.codigo{color:var(--apagado); font-size:10.5px; letter-spacing:.6px; margin-left:6px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .motivo{color:var(--tenue); font-size:12px}
 
 .barra{height:5px; background:var(--linea); border-radius:99px; overflow:hidden; margin-top:6px}
@@ -196,6 +200,24 @@ textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
 .reparto{display:flex; gap:2px; height:3px; margin-top:5px; border-radius:99px; overflow:hidden}
 .reparto > i{display:block; background:currentColor}
 .critico{color:var(--gold); font-weight:700; margin-left:4px; cursor:help}
+/* Lo primero que lee quien llega. Discreto pero imposible de saltarse: si hay
+   que explicar la pantalla de palabra, la pantalla está mal. */
+.empezar{border:1px solid var(--mint); border-radius:8px; padding:12px 14px;
+         margin-bottom:16px; font-size:13px; line-height:1.5}
+.empezar b{color:var(--mint)}
+.empezar p{margin:7px 0; color:var(--tenue); font-size:12.5px}
+.empezar ul{margin:0; padding-left:16px; color:var(--tenue); font-size:12.5px}
+.empezar li{margin:3px 0}
+.empezar li b{color:var(--texto); font-weight:600}
+/* «Qué hacer ahora» va antes que cualquier dato: es lo que de verdad se
+   pregunta quien abre un expediente. Y se marca si le toca a quien mira, para
+   que nadie pulse un botón que su rol no permite y reciba un 403 que parece
+   una avería. */
+.ahora{border-left:3px solid var(--borde); padding:9px 12px; margin-bottom:16px;
+       font-size:13px; color:var(--tenue); background:var(--panel); border-radius:0 8px 8px 0}
+.ahora b{color:var(--apagado); margin-right:6px}
+.ahora.mio{border-left-color:var(--mint)}
+.ahora.mio b{color:var(--mint)}
 .btn-no{color:var(--texto); background:transparent; border:1px solid var(--coral)}
 </style>
 </head>
@@ -242,6 +264,79 @@ textarea.campo{resize:vertical; font-size:13px; line-height:1.5}
 const $ = (s, d = document) => d.querySelector(s)
 /** El esquema que sirve este servidor. Llega con la lista y lo usa el detalle. */
 let ESQUEMA = {}
+
+/**
+ * ── LA JERGA SE TRADUCE, NO SE EXPLICA ────────────────────────────────────
+ *
+ * `VALIDADO`, `G3`, `SIN_ANCLAJE` son nombres del sistema, y son buenos: cortos,
+ * exactos y auditables. Pero un oficial de sucursal no tiene por qué aprender el
+ * vocabulario de nadie para hacer su trabajo.
+ *
+ * Se enseñan las dos cosas: la frase que se entiende, y el código al lado en
+ * gris. Quien tenga que citar el código en un informe lo tiene; quien solo
+ * quiera trabajar, no lo necesita.
+ */
+const ESTADO_HUMANO = {
+  CAPTURADO:  'recién recibido',
+  EXTRAIDO:   'datos propuestos',
+  VALIDADO:   'faltan datos',
+  COMPLETO:   'listo para firmar',
+  APROBADO:   'aprobado',
+  RECHAZADO:  'rechazado',
+  DESCARTADO: 'descartado',
+  DUPLICADO:  'ya existía'
+}
+
+const GUARDIA_HUMANA = {
+  G1:  'el dato no es del tipo que debería',
+  G2:  'el valor no está entre los permitidos',
+  G3:  'esa frase no aparece en el documento',
+  G4:  'falta la unidad, o está dentro del número',
+  G5:  'el expediente no tiene ese campo',
+  G6:  'la cédula no tiene forma de cédula panameña',
+  G7:  'el documento está vencido',
+  G8:  'las cuentas no cuadran entre sí',
+  G9:  'dos cosas distintas salen de la misma palabra',
+  G10: 'la frase salta de un párrafo a otro'
+}
+
+const enHumano = (codigo, mapa) => mapa[codigo] ?? codigo
+
+/**
+ * ── QUÉ HACER AHORA, QUE ES LO QUE DE VERDAD SE PREGUNTA ──────────────────
+ *
+ * Un estado dice DÓNDE está el expediente. Quien lo tiene delante quiere saber
+ * otra cosa: qué le toca hacer, y si le toca a él.
+ *
+ * La respuesta depende del rol, y decirlo así evita el peor momento de una
+ * demostración: alguien pulsa un botón que su rol no permite y recibe un 403 que
+ * parece una avería.
+ */
+function queHacerAhora (e, miRol) {
+  if ((e.conflictos ?? []).length) {
+    return miRol === 'oficial'
+      ? { texto: 'Dos documentos se contradicen. Elige cuál vale.', mio: true }
+      : { texto: 'Dos documentos se contradicen: lo resuelve la oficial de cuenta.', mio: false }
+  }
+  if (e.estado === 'VALIDADO') {
+    return miRol === 'oficial'
+      ? { texto: 'Faltan datos que la norma exige. Captura el documento que falte.', mio: true }
+      : { texto: 'Faltan datos: el expediente está con la oficial de cuenta.', mio: false }
+  }
+  if (e.estado === 'COMPLETO') {
+    return miRol === 'aprobador'
+      ? { texto: 'Está completo y espera tu firma.', mio: true }
+      : { texto: 'Completo. Espera la firma del gerente.', mio: false }
+  }
+  if (e.estado === 'APROBADO') return { texto: 'Firmado. No admite más cambios.', mio: false }
+  if (e.estado === 'RECHAZADO') return { texto: 'Rechazado, con su motivo. No admite más cambios.', mio: false }
+  if (e.estado === 'CAPTURADO') {
+    return miRol === 'oficial'
+      ? { texto: 'Se guardó lo que dijo el cliente. Falta que el modelo proponga los campos.', mio: true }
+      : { texto: 'Recién recibido, todavía sin procesar.', mio: false }
+  }
+  return null
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 
 /**
@@ -253,6 +348,31 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&l
  */
 function pintarCaptura () {
   const caja = $('#captura')
+
+  // ── SIN ROL, LA PANTALLA NO OFRECÍA NADA Y TAMPOCO LO DECÍA ──────────────
+  //
+  // Quien abre esto por primera vez no tiene rol, así que no veía ni el
+  // formulario de captura ni el panel de firma: una pantalla que solo deja
+  // mirar, sin una palabra que explique por qué. Y el selector está arriba a la
+  // derecha, que es donde nadie busca primero.
+  //
+  // Ahora lo primero que se lee es qué hacer. Cuesta cuatro líneas y es la
+  // diferencia entre entender el sistema y cerrarlo.
+  if (!rol()) {
+    caja.innerHTML = `
+      <div class="empezar">
+        <b>Elige tu rol</b> arriba a la derecha ↗
+        <p>Este sistema separa funciones, como un banco: quien prepara el
+           expediente no es quien lo firma.</p>
+        <ul>
+          <li><b>oficial de cuenta</b> — atiende al cliente y prepara</li>
+          <li><b>gerente de sucursal</b> — firma, y solo él firma</li>
+          <li><b>auditoría interna</b> — lee todo, no toca nada</li>
+        </ul>
+      </div>`
+    return
+  }
+
   if (rol() !== 'oficial') { caja.innerHTML = ''; return }
 
   caja.innerHTML = `
@@ -361,7 +481,7 @@ async function cargarLista () {
       : '') +
     orden.map(e => `
     <div class="exp" data-id="${esc(e.id)}" role="button" tabindex="0">
-      <div class="id">${esc(e.id)} <span class="estado e-${esc(e.estado)}">${esc(e.estado)}</span></div>
+      <div class="id">${esc(e.id)} <span class="estado e-${esc(e.estado)}" title="${esc(e.estado)}">${esc(enHumano(e.estado, ESTADO_HUMANO))}</span></div>
       <div class="meta">${e.anclados} anclados · ${e.huecos} huecos${e.duplicadoDe ? ' · dup. de ' + esc(e.duplicadoDe) : ''}</div>
       ${reparto(e.porEvidencia)}
       <div class="barra"><i style="width:${Math.round(e.completitud * 100)}%"></i></div>
@@ -409,7 +529,12 @@ async function abrirExpediente (id) {
   const huecos = Object.entries(e.huecos || {})
 
   $('#detalle').innerHTML = `
-    <h2>${esc(e.id)} · <span class="estado e-${esc(e.estado)}">${esc(e.estado)}</span></h2>
+    <h2>${esc(e.id)} · <span class="estado e-${esc(e.estado)}">${esc(enHumano(e.estado, ESTADO_HUMANO))}</span>
+      <span class="codigo">${esc(e.estado)}</span></h2>
+
+    ${(ahora => ahora ? `<div class="ahora ${ahora.mio ? 'mio' : ''}">
+      <b>${ahora.mio ? '→ Te toca a ti' : 'Ahora mismo'}</b> ${esc(ahora.texto)}
+    </div>` : '')(queHacerAhora(e, rol()))}
 
     <div class="tarjeta">
       <h2>Lo que entró al expediente</h2>
@@ -432,7 +557,7 @@ async function abrirExpediente (id) {
         ${huecos.map(([ruta, h]) => `
           <tr>
             <td class="ruta mono">${esc(ruta)}</td>
-            <td>${h.guardias.map(g => `<span class="guardia">${esc(g)}</span>`).join('')}
+            <td>${h.guardias.map(g => `<span class="guardia" title="${esc(g)}">${esc(enHumano(g, GUARDIA_HUMANA))}</span>`).join('')}
                 <span class="motivo">${esc(h.motivos.join(', '))}</span></td>
           </tr>`).join('')}
       </table>
