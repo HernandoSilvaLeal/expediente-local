@@ -112,6 +112,47 @@ puerta('cero placeholders sin rellenar', () => {
   return { ok: malos.length === 0, detalle: malos.join(', ') }
 }, 'un README con {{PENDIENTE}} dice que el trabajo no se terminó')
 
+puerta('la declaración de base preexistente está COMPLETA', () => {
+  // ── LO QUE ESTA PUERTA IMPIDE, Y ES ELIMINATORIO ─────────────────────────
+  //
+  // El artículo 11c descalifica si la base preexistente no está declarada. La
+  // puerta de al lado comprueba que la SECCIÓN existe; esta comprueba que no
+  // esté rellena de humo.
+  //
+  // Había una fila que decía «*(pesos de los modelos)* | *(pendiente)*». La
+  // sección existía, la puerta pasaba, y la declaración no declaraba nada: el
+  // componente más pesado del proyecto —1,19 GiB de modelo— figuraba como
+  // pendiente. La puerta de placeholders tampoco lo veía, porque busca `{{ }}`
+  // y esto era otra forma de decir lo mismo.
+  //
+  // Es el mismo patrón que ya nos mordió cuatro veces: **buscar un texto donde
+  // hacía falta mirar el contenido.**
+  //
+  // Fuera de esta sección, «(pendiente)» es legítimo — el vídeo aún no existe y
+  // el cronometraje del setup no se ha hecho, y decirlo es lo correcto.
+  const md = readFileSync(join(RAIZ, 'README.md'), 'utf8')
+  const i = md.search(/##\s*Base preexistente/i)
+  if (i === -1) return { ok: false, detalle: 'no hay sección de base preexistente' }
+  const seccion = md.slice(i, md.indexOf('\n## ', i + 3) === -1 ? md.length : md.indexOf('\n## ', i + 3))
+  // Y sí: la primera versión de esta comprobación buscaba 'TODO' con
+  // `.toLowerCase().includes()`, así que la palabra española «todo» la hacía
+  // fallar. **Quinta aparición del mismo patrón en este proyecto** —buscar un
+  // texto donde hace falta mirar el contenido—, y esta vez dentro de la propia
+  // puerta escrita para cazarlo. Se deja escrito porque el patrón es el
+  // hallazgo, no el fallo suelto.
+  const humo = [
+    { pat: /\(pendiente\)/i,        nombre: '(pendiente)' },
+    { pat: /\bTODO\b/,              nombre: 'TODO' },      // mayúsculas y palabra entera
+    { pat: /\bTBD\b/i,              nombre: 'TBD' },
+    { pat: /\bpor definir\b/i,      nombre: 'por definir' },
+    { pat: /\bXXX\b/,               nombre: 'XXX' }
+  ].filter(h => h.pat.test(seccion)).map(h => h.nombre)
+  return {
+    ok: humo.length === 0,
+    detalle: humo.length ? `la declaración contiene: ${humo.join(', ')}` : ''
+  }
+}, 'declarar «pendiente» es no declarar, y el art. 11c descalifica por eso')
+
 puerta('README con sección de base preexistente', () => {
   if (!existsSync(join(RAIZ, 'README.md'))) return { ok: false, detalle: 'no hay README' }
   const src = readFileSync(join(RAIZ, 'README.md'), 'utf8')

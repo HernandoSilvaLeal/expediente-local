@@ -490,7 +490,18 @@ is listed as not measured.
 | `@qvac/sdk` | 0.18.2 (exacta) | https://qvac.tether.io | Apache-2.0 | SDK obligatorio del evento: inferencia local y delegación entre pares |
 | `hyperswarm`, `hyperdht`, `protomux` | ver `malla/package-lock.json` | Holepunch | MIT | Descubrimiento y transporte P2P de la malla propia |
 | Node.js | ≥ 20 | nodejs.org | MIT | Tiempo de ejecución |
-| *(pesos de los modelos)* | *(pendiente)* | `registry://` de QVAC | *(pendiente)* | Extracción, OCR, transcripción |
+| **MedPsy 1.7B** | `d1fb95f7cec096ea…` · SHA-256 `41ee947d9cce72ec…` | `registry://` de QVAC | ver la ficha del modelo en el registro | texto → campos estructurados (json_schema → GBNF) |
+| **OCR latin_g2** | `1bd09b23f28caa7e…` · SHA-256 `dd1c7a436e917590…` | `registry://` de QVAC | ver la ficha del modelo en el registro | reconocimiento de texto en imagen, determinista |
+| **CRAFT mlt_25k** | `bb5d57baeb6ae9e7…` · SHA-256 `74501993caf4581c…` | `registry://` de QVAC | ver la ficha del modelo en el registro | detección de regiones de texto |
+| **Whisper es-tiny q8_0** | `c4c6196526e47622…` · SHA-256 `e18a4e2374b5f915…` | `registry://` de QVAC | ver la ficha del modelo en el registro | transcripción de dictado en español |
+| **Chatterbox s3gen** | `d2d7cb61032368ee…` · SHA-256 `44496b0fc6e9d165…` | `registry://` de QVAC | ver la ficha del modelo en el registro | síntesis de voz (no usado en el flujo principal) |
+| **Chatterbox t3** | `d473922a753fa51a…` · SHA-256 `99645a36944f8337…` | `registry://` de QVAC | ver la ficha del modelo en el registro | síntesis de voz (no usado en el flujo principal) |
+
+**Los pesos no se redistribuyen**: se descargan del registro de QVAC con
+`npm run setup` y quedan en `~/.qvac/models/`. Los SHA-256 de arriba son los de
+esta máquina, y sirven para comprobar que el archivo que baja es el mismo. El
+nombre de archivo que asigna el registro empieza por su propio identificador,
+que es lo que aparece entre comillas.
 
 **Dependencias de terceros en el núcleo: ninguna.** `core/`, `pruebas/` y los scripts de
 verificación usan solo la biblioteca estándar de Node.
