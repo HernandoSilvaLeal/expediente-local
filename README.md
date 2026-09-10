@@ -207,7 +207,7 @@ sobre inventario hospitalario, sin tocar una línea de `core/`.
 | Tests | **267 / 267** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **165** (62 %) |
 | Casos de uso de sucursal, punta a punta | **14** |
-| Módulos deterministas / que tocan un modelo | **16 / 1** → **94,1 %** |
+| Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
 | Puertas de entrega en PASS | **11 / 11** |
 
