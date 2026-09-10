@@ -408,18 +408,47 @@ export function abrirExpediente ({
  * dato es un dataset en el que hay que creer.
  */
 export function aCsv (expediente) {
-  const filas = [['campo', 'valor', 'evidencia', 'cita', 'origen', 'guardias', 'motivo'].join(',')]
+  // ── LAS COLUMNAS SON EL CONTRATO CON QUIEN AUDITA ─────────────────────────
+  //
+  // `expediente` va primero porque un CSV sin la clave del registro no se puede
+  // juntar con otro, y juntar es lo primero que hace quien recibe un dataset.
+  // Faltaba, y solo se nota cuando alguien exporta dos expedientes y los apila.
+  //
+  // `desde`/`hasta` son la posición exacta del anclaje sobre el texto de origen.
+  // Sin ellas, «esto sale del documento» es una afirmación; con ellas, quien
+  // audite puede abrir la fuente y mirar el trozo. Es la misma idea que el
+  // `char_interval` de LangExtract, y no cuesta nada porque ya estaba calculada.
+  //
+  // `firmante` cierra la pregunta que un supervisor bancario hace primero:
+  // ¿quién aprobó esto? Va en cada fila a propósito — un CSV se filtra y se
+  // ordena, y una columna que solo existe en una fila suelta se pierde.
+  const filas = [['expediente', 'campo', 'valor', 'evidencia', 'cita',
+                  'desde', 'hasta', 'origen', 'guardias', 'motivo', 'firmante'].join(',')]
+
+  const id = expediente.id ?? ''
+  const firma = (expediente.decisiones ?? []).at(-1)
+  const firmante = firma ? `${firma.que}: ${firma.oficial ?? '—'}` : ''
 
   for (const [ruta, c] of Object.entries(expediente.campos)) {
-    filas.push([ruta, c.valor, c.evidencia, c.cita, c.origen, '', ''].map(escapar).join(','))
+    filas.push([id, ruta, c.valor, c.evidencia, c.cita,
+                c.donde?.desde ?? '', c.donde?.hasta ?? '',
+                c.origen, '', '', firmante].map(escapar).join(','))
   }
 
   // LOS HUECOS VAN EN EL MISMO CSV, no en un anexo que nadie abre. Un campo que
   // falta y un campo que el sistema RECHAZÓ no son lo mismo, y la diferencia es
   // justo lo que un auditor quiere ver: qué guardia lo paró y por qué.
   for (const [ruta, h] of Object.entries(expediente.huecos ?? {})) {
-    filas.push([ruta, '', 'Desconocido', '', '', h.guardias.join('|'), h.motivos.join('|')]
-      .map(escapar).join(','))
+    filas.push([id, ruta, '', 'Desconocido', '', '', '', '',
+                h.guardias.join('|'), h.motivos.join('|'), firmante].map(escapar).join(','))
+  }
+
+  // Y LOS CONFLICTOS ABIERTOS, que no son ni campo ni hueco: son una pregunta
+  // sin responder sobre un dato que YA está dentro. Omitirlos del dataset sería
+  // entregarlo como si estuviera resuelto.
+  for (const c of expediente.conflictos ?? []) {
+    filas.push([id, c.ruta, c.asentado, 'EN DISPUTA', c.citaAsentada, '', '', '',
+                'G-CONFLICTO', `otra fuente dice: ${c.propuesto}`, firmante].map(escapar).join(','))
   }
   return filas.join('\n')
 }

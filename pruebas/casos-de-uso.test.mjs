@@ -297,10 +297,15 @@ test('CU-10 · el CSV dice qué guardia paró cada dato que falta', () => {
     const csv = aCsv(exp.leer())
     const lineas = csv.split('\n')
 
-    assert.match(lineas[0], /campo,valor,evidencia,cita,origen,guardias,motivo/)
+    // El encabezado es el CONTRATO con quien audita, y se comprueba entero:
+    // si alguien quita una columna, este test lo dice. `expediente` va primero
+    // porque un CSV sin la clave del registro no se puede juntar con otro, y
+    // `desde`/`hasta` son la posición del anclaje sobre el texto de origen.
+    assert.equal(lineas[0],
+      'expediente,campo,valor,evidencia,cita,desde,hasta,origen,guardias,motivo,firmante')
     assert.ok(csv.includes('Juan Pérez González'), 'lo aceptado sale')
     // Y lo RECHAZADO también sale, en el mismo archivo, con su culpable
-    const hueco = lineas.find(l => l.startsWith('titular.cedula'))
+    const hueco = lineas.find(l => l.includes(',titular.cedula,'))
     assert.ok(hueco, 'el hueco tiene que aparecer, no desaparecer')
     assert.match(hueco, /G3/)
     assert.match(hueco, /SIN_ANCLAJE/)
