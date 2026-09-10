@@ -276,20 +276,80 @@ export const GUARDIAS_BANCA = Object.freeze([
       return { motivo: r.motivo, detalle: r.detalle }
     }
   }),
+  // G8 NO está en esta tabla, y la razón es de diseño, no de olvido:
+  // ver GUARDIAS_DE_REGISTRO, justo debajo.
+
+  // G9 —conflicto entre fuentes— tampoco: vive en core/dedup.mjs, porque comparar
+  // dos registros del mismo tipo no es conocimiento de banca. Lo que sí es de
+  // banca es qué campo hace de identidad, y eso lo declara el esquema.
+])
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GUARDIAS DE REGISTRO — las que necesitan ver VARIOS campos a la vez
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ── LA DISTINCIÓN QUE OBLIGÓ A PARTIR LA TABLA EN DOS ──────────────────────
+ *
+ * G1..G7 miran UN campo: su tipo, su rango, su cita, su unidad, su forma. Se les
+ * puede pasar el campo y ya.
+ *
+ * G8 no. Para saber si `salario × períodos = total` hacen falta **tres campos a
+ * la vez**, y ninguno de los tres está mal por separado: lo que está mal es la
+ * relación entre ellos. Meterla en la misma tabla obligaba a que una guardia de
+ * campo espiara los campos vecinos, que es como se empiezan a filtrar
+ * dependencias raras por todo un sistema.
+ *
+ * Y hay un tercer nivel, por si aparece: G9 mira varios REGISTROS a la vez, y
+ * por eso vive en `core/dedup.mjs`.
+ *
+ *   campo    → G1..G7        «este dato está mal»
+ *   registro → G8            «estos datos no encajan entre sí»
+ *   conjunto → G9            «este registro contradice a otro»
+ */
+export const GUARDIAS_DE_REGISTRO = Object.freeze([
   Object.freeze({
-    id: 'G8', que: 'coherencia aritmética entre documentos',
-    porque: 'dos documentos que se contradicen en números no pueden entrar los dos como ciertos',
-    aplicar ({ contexto }) {
-      const c = contexto?.aritmetica
-      if (!c) return null
-      const r = cuadra(c.parcial, c.periodos, c.total, c)
-      return r.comprobable && !r.cuadra ? { motivo: r.motivo, detalle: r.detalle } : null
+    id: 'G8', que: 'coherencia aritmética dentro de un registro',
+    porque: 'tres números que no se multiplican entre sí significan que alguno se leyó mal',
+    aplicar (campos, esquema) {
+      const decl = esquema?.aritmetica
+      if (!decl) return []
+
+      // Se agrupa por índice: cada documento cuadra consigo mismo, no con el vecino.
+      const porIndice = new Map()
+      for (const c of campos) {
+        const m = /\[(\d+)\]/.exec(c.ruta)
+        const i = m ? m[1] : '_'
+        if (!porIndice.has(i)) porIndice.set(i, {})
+        porIndice.get(i)[rutaGenerica(c.ruta)] = c
+      }
+
+      const rechazos = []
+      for (const [, grupo] of porIndice) {
+        const p = grupo[decl.parcial], n = grupo[decl.periodos], t = grupo[decl.total]
+        if (!p || !n || !t) continue                 // faltan datos: no hay nada que cuadrar
+        if ([p, n, t].some(c => c.aceptado === false)) continue   // ya cayeron por otra guardia
+
+        const r = cuadra(p.valor, n.valor, t.valor, esquema.aritmetica ?? {})
+        if (r.comprobable && !r.cuadra) {
+          // Se marca el TOTAL, no los tres. Marcar los tres no dice nada: alguno
+          // de ellos es correcto y el operador tendría que adivinar cuál.
+          rechazos.push({ ruta: t.ruta, guardia: 'G8', motivo: r.motivo, detalle: r.detalle })
+        }
+      }
+      return rechazos
     }
   })
-  // G9 —conflicto entre fuentes— NO está aquí: vive en core/dedup.mjs, porque
-  // comparar dos registros del mismo tipo no es conocimiento de banca. Lo que sí
-  // es de banca es qué campo hace de identidad, y eso lo declara el esquema.
 ])
+
+/** Aplica las guardias que necesitan ver el registro entero. */
+export function revisarRegistro (campos, esquema) {
+  const rechazos = []
+  for (const g of GUARDIAS_DE_REGISTRO) {
+    for (const r of g.aplicar(campos, esquema) ?? []) rechazos.push(r)
+  }
+  return Object.freeze(rechazos.map(Object.freeze))
+}
 
 /** Aplica las guardias de dominio a un campo ya revisado por el núcleo. */
 export function revisarDominio (campo, contexto = {}) {

@@ -29,7 +29,7 @@ export async function cargarDominio (esquema, contexto = {}) {
   if (!esquema?.guardiasDominio) {
     // Un esquema sin guardias de dominio es legítimo: el de salud no tiene
     // cédulas panameñas que validar. No es un error, es otro dominio.
-    return { revisar: null, contexto, origen: null }
+    return { revisar: null, revisarRegistro: null, contexto, origen: null }
   }
 
   try {
@@ -38,7 +38,13 @@ export async function cargarDominio (esquema, contexto = {}) {
     if (typeof mod.revisarDominio !== 'function') {
       throw new Error('el módulo no exporta revisarDominio()')
     }
-    return { revisar: mod.revisarDominio, contexto, origen: esquema.guardiasDominio }
+    return {
+      revisar: mod.revisarDominio,
+      // Opcional: no todo dominio tiene guardias de registro.
+      revisarRegistro: typeof mod.revisarRegistro === 'function' ? mod.revisarRegistro : null,
+      contexto,
+      origen: esquema.guardiasDominio
+    }
   } catch (e) {
     // NO se sigue en silencio, y esa es la decisión importante de este archivo.
     //

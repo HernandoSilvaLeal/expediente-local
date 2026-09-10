@@ -50,7 +50,10 @@
               },
               "emisor":        { "$ref": "#/$defs/campoTexto" },
               "fecha_emision": { "$ref": "#/$defs/campoTexto" },
-              "monto":         { "$ref": "#/$defs/campoNumero" }
+              "monto":         { "$ref": "#/$defs/campoNumero" },
+              "salario_mensual":  { "$ref": "#/$defs/campoNumero" },
+              "periodos":         { "$ref": "#/$defs/campoNumero" },
+              "total_declarado":  { "$ref": "#/$defs/campoNumero" }
             }
           }
         }
@@ -101,7 +104,16 @@
   ],
 
   "unidades": {
-    "documentos[].monto": "balboas"
+    "documentos[].monto": "balboas",
+    "documentos[].salario_mensual": "balboas",
+    "documentos[].total_declarado": "balboas"
+  },
+
+  "aritmetica": {
+    "parcial": "documentos[].salario_mensual",
+    "periodos": "documentos[].periodos",
+    "total": "documentos[].total_declarado",
+    "$": "Que G8 tiene que cuadrar. Las rutas van aqui, en el esquema, y no dentro de la guardia: asi el mismo G8 sirve para cualquier trio de campos que deba multiplicar."
   },
 
   "$nota_unidades": "Fuera del json_schema a propósito: el json_schema es la gramática que restringe al modelo (llama.cpp lo compila a GBNF); esto es contrato de validación y lo lee G4. Son dos consumidores distintos y mezclarlos ensucia los dos. Panamá usa el balboa a la par con el dólar y en la calle se dicen ambos: los sinónimos están en core/guardias.mjs.",

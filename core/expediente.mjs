@@ -47,6 +47,9 @@ export function abrirExpediente ({
   // Quien abre el expediente decide qué reglas de negocio aplican. El núcleo
   // solo sabe que existe una función y que devuelve rechazos.
   guardiasDominio = null,
+  // Las de REGISTRO necesitan ver varios campos a la vez —«estos datos no encajan
+  // entre sí»— y por eso son otra función. Ver instancias/banca/guardias.mjs.
+  guardiasRegistro = null,
   contextoDominio = {}
 }) {
   if (!ruta)     throw new Error('abrirExpediente necesita la ruta del ledger')
@@ -123,26 +126,44 @@ export function abrirExpediente ({
           })
         : revisionNucleo.campos
 
-      const rechazados = campos.filter(c => !c.aceptado).length
+      // Las de REGISTRO, sobre lo que sigue en pie tras las de campo.
+      const deRegistro = guardiasRegistro ? guardiasRegistro(campos, esquema) : []
+      const porRuta = new Map()
+      for (const r of deRegistro) {
+        if (!porRuta.has(r.ruta)) porRuta.set(r.ruta, [])
+        porRuta.get(r.ruta).push({ guardia: r.guardia, motivo: r.motivo, detalle: r.detalle })
+      }
+      const campos2 = porRuta.size === 0 ? campos : campos.map(c => {
+        const extra = porRuta.get(c.ruta)
+        if (!extra || !c.aceptado) return c
+        return Object.freeze({
+          ...c, aceptado: false, propuesto: c.valor,
+          valor: esquema.vacios?.[typeof c.valor === 'number' ? 'numero' : 'texto'] ?? 'DESCONOCIDO',
+          evidencia: 'Desconocido',
+          rechazos: Object.freeze([...c.rechazos, ...extra])
+        })
+      })
+
+      const rechazados = campos2.filter(c => !c.aceptado).length
       const resumen = Object.freeze({
         ...revisionNucleo.resumen,
-        aceptados: campos.length - rechazados,
+        aceptados: campos2.length - rechazados,
         rechazados,
         // Un crítico que las guardias de DOMINIO tumbaron cuenta igual que uno
         // que nunca vino: el expediente no puede cerrar con él.
         faltanCriticos: Object.freeze((esquema.camposCriticos ?? []).filter(cr =>
-          !campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))),
+          !campos2.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))),
         completo: (esquema.camposCriticos ?? []).every(cr =>
-          campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))
+          campos2.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))
       })
 
-      hecho(EVENTO.EXTRACCION, { origen, datos: { campos: campos.length } })
+      hecho(EVENTO.EXTRACCION, { origen, datos: { campos: campos2.length } })
       transitarSiPuede(ESTADOS.EXTRAIDO, origen)
 
       hecho(EVENTO.REVISION, {
         origen: ORIGENES.REGLA,
         datos: {
-          campos: campos.map(c => ({
+          campos: campos2.map(c => ({
             ruta: c.ruta, aceptado: c.aceptado, valor: c.valor,
             cita: c.cita, evidencia: c.evidencia,
             // El motivo del rechazo viaja al ledger: es lo que se exporta al
@@ -156,7 +177,7 @@ export function abrirExpediente ({
       transitarSiPuede(ESTADOS.VALIDADO, ORIGENES.REGLA)
       if (resumen.completo) transitarSiPuede(ESTADOS.COMPLETO, ORIGENES.REGLA)
 
-      return Object.freeze({ revision: { campos, resumen }, expediente: this.leer() })
+      return Object.freeze({ revision: { campos: campos2, resumen }, expediente: this.leer() })
     },
 
     /**

@@ -62,6 +62,7 @@ const dominio = await cargarDominio(esquema, { hoy: new Date() })
 const exp = abrirExpediente({
   ruta, esquema, id: op.expediente,
   guardiasDominio: dominio.revisar,
+  guardiasRegistro: dominio.revisarRegistro,
   contextoDominio: dominio.contexto
 })
 

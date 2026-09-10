@@ -1,0 +1,569 @@
+{
+  "$": "BANCO DE CASOS TRAMPA — uno por cada forma conocida de que un dato malo entre al dataset.",
+  "$como_se_lee": [
+    "Cada caso trae la FUENTE (lo que se dictó o se leyó) y la EXTRACCIÓN (lo que el modelo",
+    "propuso), más lo que DEBE pasar. `npm run casos` los corre todos y compara.",
+    "",
+    "Los marcados `medido: true` NO son inventados: son salidas reales de MedPsy 1.7B en esta",
+    "máquina el 9-sep-2026, con json_schema activo y temperatura 0.",
+    "",
+    "Los demás son casos trampa deliberados, uno por guardia, escritos para que ninguna guardia",
+    "quede sin un caso que la ejercite. Una guardia sin caso es una guardia que nadie ha visto",
+    "trabajar."
+  ],
+  "$datos": "TODOS SINTÉTICOS Y FICTICIOS. El enunciado del reto prohíbe datos reales de clientes.",
+  "casos": [
+    {
+      "id": "C01",
+      "titulo": "El camino que el banco quiere",
+      "medido": false,
+      "fuente": "El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Juan Pérez González",
+            "cita": "El titular es Juan Pérez González"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "cédula 8-123-456"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 45.3,
+              "cita": "por 45.30 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazados": 0,
+        "estado": "COMPLETO"
+      }
+    },
+    {
+      "id": "C02",
+      "titulo": "INVENCIÓN PURA — una cédula que nadie dijo",
+      "medido": true,
+      "guardia": "G3",
+      "fuente": "El titular es Juan Pérez González. La cédula no se alcanza a leer en la copia.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Juan Pérez González",
+            "cita": "El titular es Juan Pérez González"
+          },
+          "cedula": {
+            "valor": "8-123-456",
+            "cita": "cédula 8-123-456"
+          }
+        },
+        "documentos": []
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "titular.cedula"
+        ],
+        "estado": "VALIDADO"
+      },
+      "$por_que": "El modelo rellenó un hueco en vez de dejarlo vacío. Es el fallo más caro: parece un dato."
+    },
+    {
+      "id": "C03",
+      "titulo": "INVENCIÓN CON COARTADA — la cita es real, el valor no sale de ella",
+      "medido": true,
+      "guardia": "G3",
+      "fuente": "El titular es Ana Ruiz, cédula 4-321-987. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 30.00 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Ana Ruiz",
+            "cita": "El titular es Ana Ruiz"
+          },
+          "cedula": {
+            "valor": "4-321-987",
+            "cita": "cédula 4-321-987"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "ETESA",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 30.0,
+              "cita": "por 30.00 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].emisor"
+        ]
+      },
+      "$por_que": "Un verificador que solo comprobara que la cita existe habría dejado pasar esto."
+    },
+    {
+      "id": "C04",
+      "titulo": "CANTIDAD CAMBIADA — el número no está en su propia cita",
+      "medido": true,
+      "guardia": "G3",
+      "fuente": "El titular es Luis Gómez, cédula 2-111-222. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Luis Gómez",
+            "cita": "El titular es Luis Gómez"
+          },
+          "cedula": {
+            "valor": "2-111-222",
+            "cita": "cédula 2-111-222"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 999.99,
+              "cita": "por 45.30 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].monto"
+        ]
+      }
+    },
+    {
+      "id": "C05",
+      "titulo": "TIPO EQUIVOCADO — un número que llega como texto",
+      "medido": false,
+      "guardia": "G1",
+      "fuente": "El titular es Rosa Díaz, cédula 6-555-444. Recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Rosa Díaz",
+            "cita": "El titular es Rosa Díaz"
+          },
+          "cedula": {
+            "valor": "6-555-444",
+            "cita": "cédula 6-555-444"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": "45.30",
+              "cita": "por 45.30 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].monto"
+        ]
+      },
+      "$por_que": "No se convierte en silencio. Convertir esconde el fallo, y el siguiente sería 'cuarenta y cinco'."
+    },
+    {
+      "id": "C06",
+      "titulo": "ENUM INVENTADO — un tipo de documento que no existe",
+      "medido": false,
+      "guardia": "G2",
+      "fuente": "El titular es Pedro Salas, cédula 9-888-777. Trae una escritura pública del 20 de agosto de 2026.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Pedro Salas",
+            "cita": "El titular es Pedro Salas"
+          },
+          "cedula": {
+            "valor": "9-888-777",
+            "cita": "cédula 9-888-777"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "ESCRITURA_PUBLICA",
+            "emisor": {
+              "valor": "DESCONOCIDO",
+              "cita": ""
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 0,
+              "cita": ""
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].tipo"
+        ]
+      },
+      "$por_que": "Es la ÚNICA defensa de un nodo sin cita: sin G2, ese campo no lo revisa nadie."
+    },
+    {
+      "id": "C07",
+      "titulo": "UNIDAD AUSENTE — un monto cuya cita no habla de dinero",
+      "medido": false,
+      "guardia": "G4",
+      "fuente": "El titular es Carmen Vega, cédula 7-333-222. Recibo del IDAAN del 20 de agosto de 2026, número 45.30 en la referencia.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Carmen Vega",
+            "cita": "El titular es Carmen Vega"
+          },
+          "cedula": {
+            "valor": "7-333-222",
+            "cita": "cédula 7-333-222"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 45.3,
+              "cita": "número 45.30 en la referencia"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].monto"
+        ]
+      },
+      "$por_que": "Un número de referencia no es un monto aunque el número coincida."
+    },
+    {
+      "id": "C08",
+      "titulo": "CAMPO INTRUSO — el modelo devuelve algo que nadie le pidió",
+      "medido": false,
+      "guardia": "G5",
+      "fuente": "El titular es Marta Ortiz, cédula 3-222-111. Recibo del IDAAN del 20 de agosto de 2026 por 12.00 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Marta Ortiz",
+            "cita": "El titular es Marta Ortiz"
+          },
+          "cedula": {
+            "valor": "3-222-111",
+            "cita": "cédula 3-222-111"
+          },
+          "pasaporte": {
+            "valor": "PA9988776",
+            "cita": "El titular es Marta Ortiz"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 12.0,
+              "cita": "por 12.00 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "titular.pasaporte"
+        ]
+      },
+      "$por_que": "El esquema tiene additionalProperties:false, pero json_schema.strict es un PLACEBO: no lo aplica por ti."
+    },
+    {
+      "id": "C09",
+      "titulo": "PROVINCIA IMPOSIBLE — el error de OCR que ningún modelo detecta",
+      "medido": false,
+      "guardia": "G6",
+      "fuente": "El titular es Óscar Ríos, cédula 0-123-456. Recibo del IDAAN del 20 de agosto de 2026 por 22.50 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Óscar Ríos",
+            "cita": "El titular es Óscar Ríos"
+          },
+          "cedula": {
+            "valor": "0-123-456",
+            "cita": "cédula 0-123-456"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 22.5,
+              "cita": "por 22.50 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "titular.cedula"
+        ],
+        "estado": "VALIDADO"
+      },
+      "$por_que": "La cédula ancla perfectamente: está en el texto. Y aun así es imposible — en Panamá no hay provincia 0. Anclar no basta: el dato tiene que ser POSIBLE."
+    },
+    {
+      "id": "C10",
+      "titulo": "DOCUMENTO VENCIDO — un recibo de hace medio año",
+      "medido": false,
+      "guardia": "G7",
+      "fuente": "El titular es Elena Cruz, cédula 5-777-888. Recibo del IDAAN del 12 de marzo de 2026 por 18.00 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Elena Cruz",
+            "cita": "El titular es Elena Cruz"
+          },
+          "cedula": {
+            "valor": "5-777-888",
+            "cita": "cédula 5-777-888"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "12 de marzo de 2026",
+              "cita": "del 12 de marzo de 2026"
+            },
+            "monto": {
+              "valor": 18.0,
+              "cita": "por 18.00 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].fecha_emision"
+        ]
+      },
+      "$por_que": "Un recibo de hace 182 días no prueba domicilio hoy. Es regla de admisión, no capricho."
+    },
+    {
+      "id": "C11",
+      "titulo": "EL DATO ATENUADO — la fuente duda, y el sistema tampoco afirma",
+      "medido": true,
+      "fuente": "El titular es Raúl Mena, cédula 1-444-555. Creo que el recibo del IDAAN es del 20 de agosto de 2026.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Raúl Mena",
+            "cita": "El titular es Raúl Mena"
+          },
+          "cedula": {
+            "valor": "1-444-555",
+            "cita": "cédula 1-444-555"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "RECIBO_SERVICIO",
+            "emisor": {
+              "valor": "IDAAN",
+              "cita": "el recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": "del 20 de agosto de 2026"
+            },
+            "monto": {
+              "valor": 0,
+              "cita": ""
+            }
+          }
+        ]
+      },
+      "espera": {
+        "evidencia": {
+          "documentos[0].emisor": "Estimado"
+        }
+      },
+      "$por_que": "«Creo que» es un atenuador. El sistema no puede afirmar más que la fuente — y el modelo, ante este mismo texto, devolvió 'Confirmado'."
+    },
+    {
+      "id": "C12",
+      "titulo": "TODO MAL A LA VEZ — y aun así lo verdadero sobrevive",
+      "medido": false,
+      "fuente": "El titular es Sofía Lara, cédula 8-999-111. Recibo del IDAAN del 20 de agosto de 2026 por 55.00 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Sofía Lara",
+            "cita": "El titular es Sofía Lara"
+          },
+          "cedula": {
+            "valor": "8-000-000",
+            "cita": "cédula 8-000-000"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "TESTAMENTO",
+            "emisor": {
+              "valor": "ETESA",
+              "cita": "Recibo del IDAAN"
+            },
+            "fecha_emision": {
+              "valor": "31 de febrero de 2026",
+              "cita": "del 31 de febrero de 2026"
+            },
+            "monto": {
+              "valor": "mucho dinero",
+              "cita": "por 55.00 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "titular.cedula",
+          "documentos[0].tipo",
+          "documentos[0].emisor",
+          "documentos[0].monto"
+        ],
+        "conserva": [
+          "titular.nombre"
+        ]
+      },
+      "$por_que": "El caso que prueba que el rechazo no es indiscriminado: cuatro campos caen y el nombre, que sí era verdad, entra."
+    },
+    {
+      "id": "C13",
+      "titulo": "ARITMÉTICA QUE NO CUADRA — tres números que se contradicen",
+      "medido": false,
+      "guardia": "G8",
+      "fuente": "El titular es Diego Arias, cédula 4-666-333. La carta laboral dice un salario de 1000.00 balboas mensuales durante 12 meses, con un total declarado de 15000.00 balboas.",
+      "extraccion": {
+        "titular": {
+          "nombre": {
+            "valor": "Diego Arias",
+            "cita": "El titular es Diego Arias"
+          },
+          "cedula": {
+            "valor": "4-666-333",
+            "cita": "cédula 4-666-333"
+          }
+        },
+        "documentos": [
+          {
+            "tipo": "CARTA_LABORAL",
+            "emisor": {
+              "valor": "DESCONOCIDO",
+              "cita": ""
+            },
+            "fecha_emision": {
+              "valor": "20 de agosto de 2026",
+              "cita": ""
+            },
+            "monto": {
+              "valor": 0,
+              "cita": ""
+            },
+            "salario_mensual": {
+              "valor": 1000.0,
+              "cita": "un salario de 1000.00 balboas mensuales"
+            },
+            "periodos": {
+              "valor": 12,
+              "cita": "durante 12 meses"
+            },
+            "total_declarado": {
+              "valor": 15000.0,
+              "cita": "un total declarado de 15000.00 balboas"
+            }
+          }
+        ]
+      },
+      "espera": {
+        "rechazaAlMenos": [
+          "documentos[0].total_declarado"
+        ],
+        "conserva": [
+          "documentos[0].salario_mensual",
+          "documentos[0].periodos"
+        ]
+      },
+      "$por_que": "Los tres campos anclan perfectamente: los tres números están en el texto. Lo que está mal no es ningún campo, es la RELACIÓN entre ellos. Por eso G8 es una guardia de REGISTRO y no de campo. Y se marca el TOTAL, no los tres: marcar los tres no dice nada, porque alguno es correcto y el operador tendría que adivinar cuál."
+    }
+  ]
+}

@@ -101,7 +101,8 @@ const servidor = createServer(async (req, res) => {
       const cuerpo = await leerCuerpo(req)
       const exp = abrirExpediente({
         ruta: join(DATOS, `${id}.jsonl`), esquema, id,
-        guardiasDominio: dominio.revisar, contextoDominio: dominio.contexto
+        guardiasDominio: dominio.revisar, guardiasRegistro: dominio.revisarRegistro,
+        contextoDominio: dominio.contexto
       })
       try {
         const e = exp.decidir(cuerpo.que, { motivo: cuerpo.motivo ?? null })

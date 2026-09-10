@@ -79,6 +79,10 @@ export function cargarEsquema (rutaRelativa) {
     // La RUTA de las guardias de dominio, no las guardias. El núcleo no las
     // carga: solo dice dónde están, y quien arranca decide si las inyecta.
     guardiasDominio: crudo.guardias_dominio ?? null,
+    // Qué trío de campos debe cuadrar aritméticamente. Las RUTAS van en el
+    // esquema y no dentro de la guardia: así el mismo G8 sirve para cualquier
+    // dominio que tenga algo que multiplicar.
+    aritmetica: crudo.aritmetica ? Object.freeze({ ...crudo.aritmetica }) : null,
     ruta: rutaRelativa
   })
 }

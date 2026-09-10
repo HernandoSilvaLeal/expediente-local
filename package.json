@@ -19,7 +19,8 @@
     "metricas": "node scripts/metricas.mjs",
     "metricas:json": "node scripts/metricas.mjs --json",
     "verify:invariantes": "node scripts/verificar-invariantes.mjs",
-    "audit:all": "node scripts/audit-all.mjs"
+    "audit:all": "node scripts/audit-all.mjs",
+    "casos": "node scripts/casos.mjs"
   },
   "dependencies": {
     "@qvac/sdk": "0.18.2"
