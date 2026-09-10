@@ -345,12 +345,12 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 | | |
 |---|---|
 | Tests | **322 / 322** verdes, sin modelo y sin red |
-| De ellos, prueban que algo **NO** se puede | **~62 %** |
-| Casos de uso punta a punta | **18** |
-| Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G10 |
+| De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
+| Casos de uso punta a punta | **25** |
+| Casos trampa, uno por guardia | **15 / 15** — cobertura G1..G10 |
 | Módulos deterministas / que tocan un modelo | **17 / 1** → **94,4 %** |
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
-| Puertas de entrega en PASS | **12 / 12** |
+| Puertas de entrega en PASS | **12 / 13** — la 13 exige que el SDK instalado sea el declarado |
 | Invariantes O1..O5 sobre datos reales | **5 / 5** |
 
 ### ⚫ Lo que NO está medido
@@ -364,6 +364,52 @@ usted no lo pongo**:
 - **Tiempo de descarga de los pesos.** El clon limpio SÍ está medido (3 min 13 s hasta tener
   el sistema corriendo), pero `npm run setup` todavía no se ha cronometrado.
 - **OCR sobre fotografías reales.** Lo probado hasta ahora es imagen sintética.
+
+---
+
+## Trabajo previo · de quién aprendimos y en qué nos apartamos
+
+Verificar una extracción contra su fuente **no es invento nuestro**, y decir lo
+contrario sería el error más caro que podríamos cometer: se comprueba en treinta
+segundos con un buscador y arrastraría la credibilidad de todo lo demás.
+
+| Quién | Qué hace | Desde |
+|---|---|---|
+| **Google · LangExtract** | extracción con posiciones exactas de carácter sobre el texto original | jul-2025, Apache-2.0 |
+| **Anthropic · Citations API** | devuelve el fragmento del documento que sostiene cada afirmación | ene-2025 |
+| **Cohere, Vertex AI, Azure** | *spans* de origen y comprobación de fundamento (*groundedness*) | 2024-2025 |
+| **Rossum, Hyperscience, Reducto** | procesamiento inteligente de documentos, con confianza por campo | mercado maduro |
+
+**Lo que este proyecto añade son cuatro decisiones, y cada una tiene su comando:**
+
+**1 · No hay alineación difusa.** El propio `resolver.py` de LangExtract lo dice:
+*«exact matching first, then fuzzy alignment fallback if enabled»*, con
+alineación por subsecuencia común y umbrales de cobertura. Aquí no hay red: la
+cita aparece con frontera de palabra o el campo no entra. No es una omisión, es
+la decisión — y **la propagación de «ocho años» a los tres resonadores que
+medimos el 9-sep habría pasado por una alineación difusa**, porque se parece lo
+suficiente.
+
+**2 · El valor tiene que estar DENTRO de la cita.** Los sistemas de arriba
+comprueban que la cita existe. Ninguno comprueba que el valor salga de ella.
+Medido aquí: cita *«y un tomógrafo»*, valor *«Siemens»*. La cita es real y el
+valor no está en ella — una invención con coartada. Y dos guardias más cierran
+la variante fina, que es **ensanchar** una cita literal hasta que abarque otra
+entidad: G9 impide que dos entidades reclamen la misma palabra del documento, y
+G10, que una cita salte de una frase a otra.
+
+**3 · Lo que no ancla no baja de puntaje: queda como hueco, con su motivo y su
+guardia.** Un puntaje bajo es una cifra que alguien tiene que interpretar. Un
+hueco es una pregunta concreta para el cliente. Y la documentación de Reducto lo
+dice de sus propias citas: *«location markers rather than validation
+mechanisms»* — señales para mirar, no mecanismos que decidan.
+
+**4 · Un crítico en hueco bloquea la firma.** No avisa: bloquea. Y con dos
+fuentes en contradicción, tampoco se firma hasta que **una persona** lo zanje.
+
+> **Lo que no hacemos, y es deliberado:** corregir automáticamente la
+> alucinación. Azure reescribe la salida hasta que quede anclada; eso es darle
+> al modelo una segunda oportunidad. Aquí se deja el hueco.
 
 ---
 
