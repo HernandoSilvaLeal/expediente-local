@@ -1,0 +1,10 @@
+node_modules/
+models/
+*.gguf
+*.bin
+*.onnx
+vendor/
+data/
+.env
+*.log
+.DS_Store

@@ -1,0 +1,21 @@
+{
+  "name": "expediente-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Admisión de expedientes de cliente en sucursal bancaria, con toda la inferencia en el dispositivo.",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "start": "node ui/servidor.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node --test pruebas/",
+    "test:frontera": "bash scripts/verificar-frontera.sh",
+    "verify:offline": "bash scripts/verify-offline.sh",
+    "audit:all": "bash scripts/audit-all.sh"
+  },
+  "dependencies": {
+    "@qvac/sdk": "0.18.2"
+  }
+}
