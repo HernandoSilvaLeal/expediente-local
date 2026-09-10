@@ -116,6 +116,22 @@ pre{background:#0B1018; border:1px solid var(--borde); border-radius:8px;
 .pregunta{border-left:2px solid var(--gold); padding-left:12px; margin:10px 0}
 .pregunta b{color:var(--gold); font-weight:600; font-size:12px}
 
+/* El documento con lo anclado marcado. El color del resalte es el MISMO de la
+   escala de evidencia, así que la página entera habla un solo idioma. */
+.fuente{
+  font-size:13.5px; line-height:1.85; color:var(--tenue);
+  background:#0B1018; border:1px solid var(--borde); border-radius:8px;
+  padding:14px; max-height:280px; overflow:auto;
+}
+.fuente mark{
+  background:transparent; padding:1px 0 2px; border-bottom:2px solid currentColor;
+  color:var(--texto); cursor:help;
+}
+.fuente mark.ev-Confirmado{border-color:var(--ev-confirmado)}
+.fuente mark.ev-Reportado{border-color:var(--ev-reportado)}
+.fuente mark.ev-Estimado{border-color:var(--ev-estimado)}
+.fuente mark.ev-Desconocido{border-color:var(--ev-desconocido)}
+
 /* El conflicto es lo único de la interfaz donde alguien ESCRIBE. Todo lo demás
    se lee. Por eso es lo único que lleva controles de formulario. */
 .conflicto{border-top:1px solid var(--linea); padding-top:12px; margin-top:12px}
@@ -333,6 +349,15 @@ async function abrirExpediente (id) {
       </div>
     </div>
 
+    ${(e.fuentes || []).length ? `<div class="tarjeta">
+      <h2>El documento, y qué se sacó de dónde</h2>
+      <p class="aviso" style="padding-top:0">
+        cada trozo resaltado es un campo del expediente. Lo que no está
+        resaltado, no entró — y eso también se puede mirar.
+      </p>
+      <div class="fuente">${resaltar(e)}</div>
+    </div>` : ''}
+
     <div class="tarjeta">
       <h2>Dataset exportable · con columna de auditoría</h2>
       <pre>${esc(d.csv)}</pre>
@@ -381,7 +406,46 @@ function cablearConflictos (id) {
           return
         }
         await abrirExpediente(id)
-        await // ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────
+        await /**
+ * El texto de origen con cada anclaje resaltado.
+ *
+ * Es la respuesta visual a «¿de dónde sacaste esto?», y no hay que creerse
+ * nada: el trozo pintado ES el que el código encontró con indexOf, en la
+ * posición que guardó al anclarlo.
+ *
+ * Se pinta sobre el texto NORMALIZADO porque es sobre el que se midió. Enseñar
+ * el original con posiciones del normalizado desplazaría los resaltados — es el
+ * mismo desfase que ya rompió una vez la ventana de contexto, y aquí se vería.
+ */
+function resaltar (e) {
+  const texto = (e.fuentes || []).map(f => f.texto).join('\n')
+  const norm = normalizar(texto)
+  if (!norm) return ''
+
+  const tramos = Object.values(e.campos)
+    .filter(c => c.donde)
+    .map(c => ({ ...c.donde, ruta: c.ruta, evidencia: c.evidencia }))
+    .sort((a, b) => a.desde - b.desde)
+
+  let salida = '', cursor = 0
+  for (const t of tramos) {
+    if (t.desde < cursor) continue                 // solapado: ya está pintado
+    salida += esc(norm.slice(cursor, t.desde))
+    salida += `<mark class="ev-${esc(t.evidencia)}" title="${esc(t.ruta)}">` +
+              esc(norm.slice(t.desde, t.hasta)) + '</mark>'
+    cursor = t.hasta
+  }
+  return salida + esc(norm.slice(cursor))
+}
+
+/** La misma normalización que core/anclaje.mjs. Si divergen, el resaltado miente. */
+function normalizar (s) {
+  return String(s ?? '')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────
 //
 // Se guarda en este navegador y NO viaja a ningún sitio salvo dentro de la
 // firma que la persona envía. Es lo que hace que la tableta de Marta sea «la
@@ -408,6 +472,45 @@ cargarLista()
       }
     })
   }
+}
+
+/**
+ * El texto de origen con cada anclaje resaltado.
+ *
+ * Es la respuesta visual a «¿de dónde sacaste esto?», y no hay que creerse
+ * nada: el trozo pintado ES el que el código encontró con indexOf, en la
+ * posición que guardó al anclarlo.
+ *
+ * Se pinta sobre el texto NORMALIZADO porque es sobre el que se midió. Enseñar
+ * el original con posiciones del normalizado desplazaría los resaltados — es el
+ * mismo desfase que ya rompió una vez la ventana de contexto, y aquí se vería.
+ */
+function resaltar (e) {
+  const texto = (e.fuentes || []).map(f => f.texto).join('\n')
+  const norm = normalizar(texto)
+  if (!norm) return ''
+
+  const tramos = Object.values(e.campos)
+    .filter(c => c.donde)
+    .map(c => ({ ...c.donde, ruta: c.ruta, evidencia: c.evidencia }))
+    .sort((a, b) => a.desde - b.desde)
+
+  let salida = '', cursor = 0
+  for (const t of tramos) {
+    if (t.desde < cursor) continue                 // solapado: ya está pintado
+    salida += esc(norm.slice(cursor, t.desde))
+    salida += `<mark class="ev-${esc(t.evidencia)}" title="${esc(t.ruta)}">` +
+              esc(norm.slice(t.desde, t.hasta)) + '</mark>'
+    cursor = t.hasta
+  }
+  return salida + esc(norm.slice(cursor))
+}
+
+/** La misma normalización que core/anclaje.mjs. Si divergen, el resaltado miente. */
+function normalizar (s) {
+  return String(s ?? '')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
 }
 
 // ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────

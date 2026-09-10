@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  anclar, MOTIVO, normalizar, citaEstaEnFuente, valorEstaEnCita,
+  anclar, MOTIVO, normalizar, citaEstaEnFuente, valorEstaEnCita, ubicarCita, ubicarValor,
   gradoDeEvidencia, promover
 } from '../core/anclaje.mjs'
 
@@ -282,4 +282,44 @@ test('T3-23 · se buscan TODAS las apariciones, no solo la primera', () => {
   // y también hace daño: el oficial repregunta por algo que ya tiene delante.
   assert.ok(citaEstaEnFuente('500 balboas', 'Anticipo de 4500 balboas y saldo de 500 balboas.'),
     'la segunda aparición sí tiene frontera y la fuente sí lo dice')
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  T3-24 · DÓNDE ancla, no solo SI ancla
+//
+//  La posición ya se conocía —`citaEstaEnFuente` recorre el texto hasta
+//  encontrarla con frontera— y se tiraba al devolver un booleano. Guardarla no
+//  cuesta nada y cambia lo que se puede enseñar: en vez de afirmar que un dato
+//  sale del documento, se resalta el trozo del que sale.
+//
+//  Es además paridad explícita con el `char_interval` de LangExtract, que es el
+//  estado del arte abierto en esto. Hablar su vocabulario es lo que da derecho
+//  a señalar la diferencia: el nuestro exige frontera y no tiene fallback
+//  difuso.
+// ═══════════════════════════════════════════════════════════════════════════
+test('T3-24 · ubicarCita devuelve la posición, y null cuando no ancla', () => {
+  const f = 'El titular es Juan Pérez González, cédula 8-123-456.'
+
+  const donde = ubicarCita('cédula 8-123-456', f)
+  assert.ok(donde, 'la cita está en la fuente')
+  assert.equal(normalizar(f).slice(donde.desde, donde.hasta), 'cedula 8 123 456',
+    'la posición apunta EXACTAMENTE a la cita, sobre el texto normalizado')
+
+  assert.equal(ubicarCita('cédula 8-999-999', f), null, 'lo que no está, no tiene posición')
+
+  // Y hereda la frontera: un sufijo de otra cifra no ancla ni devuelve posición.
+  assert.equal(ubicarCita('500 balboas', 'el salario es de 4500 balboas'), null)
+})
+
+test('T3-25 · ubicarValor apunta al VALOR, no al principio de la cita', () => {
+  // Es la posición que importa para G9: dos entidades pueden citar fragmentos
+  // distintos y estar señalando la misma palabra.
+  const f = 'Tienen tres resonadores magnéticos Siemens y un tomógrafo.'
+
+  const a = ubicarValor('Siemens', 'tres resonadores magnéticos Siemens', f)
+  const b = ubicarValor('Siemens', 'resonadores magnéticos Siemens y un tomógrafo', f)
+
+  assert.deepEqual({ ...a }, { ...b },
+    'dos citas distintas que señalan la misma palabra dan la MISMA posición')
+  assert.equal(normalizar(f).slice(a.desde, a.hasta), 'siemens')
 })

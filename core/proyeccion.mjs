@@ -21,7 +21,7 @@
 
 import { EVENTO } from './ledger.mjs'
 import { ESTADOS, exigirTransicion } from './estado.mjs'
-import { promover, nivelEvidencia, normalizar } from './anclaje.mjs'
+import { promover, nivelEvidencia, normalizar, ubicarCita } from './anclaje.mjs'
 import { EVIDENCIA } from './esquema.mjs'
 
 export class LedgerIncoherente extends Error {
@@ -237,6 +237,11 @@ function aplicar (exp, e) {
  * mismo con menos respaldo no degrada lo que ya estaba probado; para bajar hace
  * falta una CONTRADICCION explícita, que es un hecho que alguien firma.
  */
+/** El texto de todas las capturas, que es contra lo que se ancló. */
+function fuenteDe (exp) {
+  return exp.fuentes.map(f => f.texto).join('\n')
+}
+
 function asentar (exp, c, e) {
   const previo = exp.campos.get(c.ruta)
 
@@ -279,6 +284,22 @@ function asentar (exp, c, e) {
       ? previo.valor            // el valor viaja con la evidencia que lo respalda
       : c.valor,
     cita: c.cita ?? '',
+    // ── DÓNDE, exactamente. Ya se sabía y se tiraba ──────────────────────────
+    //
+    // `citaEstaEnFuente()` recorre el texto hasta encontrar la cita con
+    // frontera de palabra: en ese momento conoce la posición y devolvía un
+    // booleano. Guardarla no cuesta nada y cambia lo que se puede enseñar:
+    // en vez de decir «esto sale del documento», se resalta el trozo.
+    //
+    // Es también paridad explícita con el `char_interval` de LangExtract, que
+    // es el estado del arte abierto en esto. Que el nuestro además exija
+    // frontera y no tenga alineación difusa es la diferencia, y se defiende
+    // mejor cuando se habla en el mismo vocabulario.
+    //
+    // El índice va sobre el texto NORMALIZADO, que es sobre el que se comparó.
+    // Devolver una posición del original obligaría a mapear entre dos
+    // longitudes distintas — el desfase que ya rompió la ventana de contexto.
+    donde: ubicarCita(c.cita ?? '', fuenteDe(exp)) ?? null,
     evidencia,
     origen: e.origen,
     seq: e.seq

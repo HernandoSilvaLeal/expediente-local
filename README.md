@@ -74,7 +74,7 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **322 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **324 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
@@ -265,7 +265,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 322 tests, sin modelo y sin red
+npm test                  # 324 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -280,7 +280,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **322/322** | 1 s |
+| `npm test` → **324/324** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
@@ -344,7 +344,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **322 / 322** verdes, sin modelo y sin red |
+| Tests | **324 / 324** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
 | Casos de uso punta a punta | **25** |
 | Casos trampa, uno por guardia | **15 / 15** — cobertura G1..G10 |
@@ -431,6 +431,12 @@ cita aparece con frontera de palabra o el campo no entra. No es una omisión, es
 la decisión — y **la propagación de «ocho años» a los tres resonadores que
 medimos el 9-sep habría pasado por una alineación difusa**, porque se parece lo
 suficiente.
+
+**1-bis · Y la posición se publica.** Cada campo del expediente lleva `donde`,
+el intervalo exacto sobre el texto donde ancló — la misma idea que el
+`char_interval` de LangExtract. La interfaz lo usa para **resaltar el fragmento
+del documento del que salió cada dato**: no hay que creerse nada, el trozo
+pintado es el que el código encontró.
 
 **2 · El valor tiene que estar DENTRO de la cita.** Los sistemas de arriba
 comprueban que la cita existe. Ninguno comprueba que el valor salga de ella.
