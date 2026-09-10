@@ -17,7 +17,8 @@
     "verify:offline": "unshare -rn bash -c 'node scripts/smoke.mjs'",
     "verify:entrega": "node scripts/verificar-entrega.mjs",
     "metricas": "node scripts/metricas.mjs",
-    "metricas:json": "node scripts/metricas.mjs --json"
+    "metricas:json": "node scripts/metricas.mjs --json",
+    "verify:invariantes": "node scripts/verificar-invariantes.mjs"
   },
   "dependencies": {
     "@qvac/sdk": "0.18.2"
