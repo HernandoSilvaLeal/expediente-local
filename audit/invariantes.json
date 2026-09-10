@@ -1,6 +1,6 @@
 {
   "_": "Los cinco invariantes, comprobados sobre los datos que hay en el disco.",
-  "fecha": "2026-09-10T18:17:24.142Z",
+  "fecha": "2026-09-10T18:18:59.153Z",
   "se_cumplen": true,
   "salida": "INVARIANTES   sobre los datos que hay en el disco, no sobre datos de test\n\n  ✓ O1  todo campo del dataset tiene una cita que existe LITERALMENTE en su fuente\n  ✓ O2  ninguna transición fuera de la tabla ocurrió jamás\n  ✓ O3  el nivel de evidencia NO subió sin una observación que lo respalde\n  ✓ O4  el nivel de evidencia NO bajó sin un evento de CONTRADICCION con motivo\n  ✓ O5  el expediente se REGENERA del ledger, byte a byte\n\n  5/5 invariantes se cumplen  sobre 3 expediente(s) reales\n  para ver el rojo:  node scripts/verificar-invariantes.mjs --demo",
   "comando": "npm run verify:invariantes",

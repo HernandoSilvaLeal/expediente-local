@@ -1,6 +1,6 @@
 {
   "_": "La máquina donde se tomaron las mediciones. Sin esto, un número de rendimiento no significa nada.",
-  "fecha": "2026-09-10T18:17:21.518Z",
+  "fecha": "2026-09-10T18:18:56.506Z",
   "cpu": {
     "modelo": "AMD Ryzen 5 3600 6-Core Processor",
     "nucleos": 12

@@ -82,6 +82,8 @@ cd expediente-local && npm ci
 | Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
 | **Los datos de ejemplo** | `npm run demo` | tres expedientes sembrados en 2 s: uno limpio, uno con invenciones, uno en conflicto |
+| **La calidad del dataset** | `npm run calidad` | tasa de anclaje, respaldo y qué guardia paró qué |
+| **La sucursal, tres dispositivos** | `npm run sucursal` | abre a la red local e imprime la IP para la tableta |
 | **La interfaz** | `npm start` → http://127.0.0.1:7301 | cero dependencias, cero build |
 
 > **Si acabas de clonar, empieza por `npm run demo`.** El repositorio no trae
@@ -352,6 +354,31 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 | Transiciones de estado legales / que lanzan | **10 / 54** → **84,4 %** de superficie cerrada |
 | Puertas de entrega en PASS | **12 / 13** — la 13 exige que el SDK instalado sea el declarado |
 | Invariantes O1..O5 sobre datos reales | **5 / 5** |
+
+### La calidad del dataset, medida
+
+**No es cuántos campos se llenaron: es cuáles sobrevivieron.** Un extractor que
+se inventa todo tiene cobertura del 100 %, así que ese número solo mide
+atrevimiento.
+
+| Indicador | Qué dice | Medido |
+|---|---|---|
+| **Tasa de anclaje** | de lo que el modelo propuso, cuánto traía una cita que existe | **90,9 %** |
+| **Tasa de respaldo** | de lo anclado, cuánto lo **afirma** la fuente | **100 %** |
+| Parados por una guardia | rechazos, que son la evidencia de que el sistema trabajó | **3**, todos G3 |
+| Sin cita **por diseño** | enums como el tipo de documento: su defensa es G2, no el anclaje | **3** |
+
+El denominador es **todo lo propuesto**, no lo aceptado: medir solo sobre lo que
+entró sería preguntarle al aprobado cómo le fue el examen.
+
+> **Y no hay umbral de «calidad aceptable».** Un 0,8 elegido por nosotros no
+> significa nada para nadie — el curso oficial de QVAC desaconseja justamente
+> los umbrales inventados. Los números están y el listón lo pone quien evalúa.
+
+```bash
+npm run calidad          # la tabla
+npm run calidad:json     # y el JSON, en audit/calidad.json
+```
 
 ### ⚫ Lo que NO está medido
 

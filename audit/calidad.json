@@ -1,0 +1,64 @@
+{
+  "_": "Calidad del dataset producido. Mide qué sobrevive a las guardias, no cuánto se llenó.",
+  "fecha": "2026-09-10T18:18:30.224Z",
+  "dominio": "banca",
+  "expedientes": 3,
+  "propuestos": 66,
+  "en_expediente": 63,
+  "anclados": 60,
+  "sin_cita_por_diseno": 3,
+  "huecos": 3,
+  "conflictosAbiertos": 1,
+  "tasa_anclaje_pct": 90.9,
+  "tasa_respaldo_pct": 100,
+  "por_evidencia": {
+    "Desconocido": 3,
+    "Estimado": 0,
+    "Reportado": 60,
+    "Confirmado": 0
+  },
+  "parados_por_guardia": {
+    "G3": 3
+  },
+  "firmados": 1,
+  "sin_firmar": 2,
+  "detalle": [
+    {
+      "id": "EXP-001",
+      "estado": "APROBADO",
+      "propuestos": 22,
+      "enExpediente": 22,
+      "anclados": 21,
+      "huecos": 0,
+      "conflictosAbiertos": 0,
+      "completitud": 1,
+      "puedeCerrar": true,
+      "firmadoPor": "M. Batista · oficial de cuenta · suc. Vía España"
+    },
+    {
+      "id": "EXP-002",
+      "estado": "VALIDADO",
+      "propuestos": 22,
+      "enExpediente": 19,
+      "anclados": 18,
+      "huecos": 3,
+      "conflictosAbiertos": 0,
+      "completitud": 0.895,
+      "puedeCerrar": false,
+      "firmadoPor": null
+    },
+    {
+      "id": "EXP-003",
+      "estado": "COMPLETO",
+      "propuestos": 22,
+      "enExpediente": 22,
+      "anclados": 21,
+      "huecos": 0,
+      "conflictosAbiertos": 1,
+      "completitud": 1,
+      "puedeCerrar": false,
+      "firmadoPor": null
+    }
+  ],
+  "comando": "npm run calidad"
+}
