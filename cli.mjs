@@ -33,9 +33,23 @@ import { abrirExpediente, aCsv } from './core/expediente.mjs'
 import { leer as leerLedger } from './core/ledger.mjs'
 import { cargarDominio } from './scripts/cargar-dominio.mjs'
 
-const { values: op, positionals } = parseArgs({
-  allowPositionals: true,
-  options: {
+// ── UNA BANDERA DESCONOCIDA NO PUEDE SER UN STACK TRACE ───────────────────
+//
+// `parseArgs` lanza ERR_PARSE_ARGS_UNKNOWN_OPTION y Node imprime el volcado
+// entero. Lo encontró una auditoría adversarial escribiendo `--motivo`, que es
+// el nombre natural para «por qué rechazas esto» y que este mismo archivo
+// llegó a documentar. Quien lo teclea no recibe una corrección: recibe seis
+// líneas de tripas de Node.
+//
+// `--motivo` se acepta como alias de `--texto` porque es lo que la gente
+// escribe, y cualquier otra bandera desconocida sale con una frase.
+const ALIAS = { '--motivo': '--texto' }
+const argv = process.argv.slice(2).map(a => {
+  const [nombre, ...resto] = a.split('=')
+  return ALIAS[nombre] ? [ALIAS[nombre], ...resto].join('=') : a
+})
+
+const OPCIONES = {
     texto:      { type: 'string' },
     archivo:    { type: 'string' },
     extraccion: { type: 'string' },
@@ -51,8 +65,20 @@ const { values: op, positionals } = parseArgs({
     hoy:        { type: 'string' },   // fija el reloj: ver abajo
     json:       { type: 'boolean', default: false },
     ayuda:      { type: 'boolean', default: false, short: 'h' }
-  }
-})
+}
+
+let op, positionals
+try {
+  ;({ values: op, positionals } = parseArgs({ args: argv, allowPositionals: true, options: OPCIONES }))
+} catch (e) {
+  // El mensaje de Node es un volcado; el de aquí dice qué escribir en su lugar.
+  const suelta = /'([^']+)'/.exec(e.message)?.[1] ?? 'esa'
+  process.stderr.write(
+    `\n  \x1b[0;31m✗ No conozco la opción ${suelta}\x1b[0m\n` +
+    `  \x1b[0;90mLas que hay: ${Object.keys(OPCIONES).map(o => '--' + o).join(' · ')}\x1b[0m\n` +
+    `  \x1b[0;90mY --motivo vale como --texto.  node cli.mjs --ayuda\x1b[0m\n\n`)
+  process.exit(1)
+}
 
 // Los colores se declaran AQUÍ, antes del primer uso, y no más abajo.
 //

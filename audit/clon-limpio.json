@@ -9,11 +9,12 @@
     "total_s": 193
   },
   "resultados": {
-    "tests": "267/267",
+    "tests": "324/324",
     "frontera_95_5": "intacta",
     "smoke": "OK, JSON válido",
-    "puertas_de_entrega": "11/11 PASS"
+    "puertas_de_entrega": "11/11 el día de la medición · hoy son 13 puertas y pasan 12"
   },
   "hallazgo": "Esta medición cazó que FALTABA package-lock.json en el repositorio. El README manda `npm ci`, que sin lockfile falla con EUSAGE: un juez siguiendo el README se estrellaba en el paso 2. Corregido en el commit anterior a esta medición.",
-  "nota": "190 s de los 193 son la descarga del SDK sin caché. En una máquina que ya tenga caché de npm, el número es mucho menor — y por eso se publica el caso PEOR, no el mejor."
+  "nota": "190 s de los 193 son la descarga del SDK sin caché. En una máquina que ya tenga caché de npm, el número es mucho menor — y por eso se publica el caso PEOR, no el mejor.",
+  "_desfase": "Los pasos y los segundos son de la medición del 10-sep 05:20 y NO se han vuelto a cronometrar. Los RESULTADOS sí están al día. Si el número de segundos vuelve a medirse, se sustituye la fecha entera: mezclar tiempos viejos con resultados nuevos sin decirlo sería justo lo que este archivo existe para evitar."
 }
