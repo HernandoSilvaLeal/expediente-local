@@ -78,6 +78,10 @@ export function cargarEsquema (rutaRelativa) {
     // nombre del campo ya falló una vez, con titular.fecha_nacimiento saliendo
     // rechazada como «documento vencido».
     vigenciaDias: Object.freeze({ ...(crudo.vigencia_dias ?? {}) }),
+    // Quién puede provocar qué. Dato, no código: ver el $comentario del esquema.
+    // Un esquema sin roles es legítimo —el de salud no tiene ventanilla— y
+    // entonces nadie está limitado, que es como se comportaba antes de existir.
+    roles: Object.freeze({ ...(crudo.roles ?? {}) }),
     // La identidad del registro, para deduplicar. Si el esquema no la declara,
     // core/dedup.mjs cae al primer campo crítico.
     claveNatural: Object.freeze([...(crudo.clave_natural ?? [])]),

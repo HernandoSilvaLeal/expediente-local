@@ -27,6 +27,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 
+import { FUENTE_ART18, titularArt18, operacionArt18 } from './fixtures.mjs'
+
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 // Puerto alto y poco transitado: si la suite corre mientras alguien tiene la
@@ -46,6 +48,39 @@ async function esperar (intentos = 60) {
     await new Promise(r => setTimeout(r, 100))
   }
   throw new Error('el servidor no arrancó')
+}
+
+/**
+ * Crea un expediente propio del test, con su conflicto ya dentro.
+ *
+ * Antes los tests compartían EXP-003, y el que resolvía primero dejaba sin
+ * conflicto al siguiente. Cada test que MUTA trabaja sobre lo suyo: si dos
+ * pruebas se pisan, lo que falla no es el sistema, es el andamio.
+ */
+async function expedienteConConflicto (id) {
+  const doc = {
+    tipo: 'RECIBO_SERVICIO',
+    emisor: { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
+    fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
+    monto: { valor: 45.30, cita: 'por 45.30 balboas' }
+  }
+  const base = (nombre, cita) => ({
+    titular: { ...titularArt18(), nombre: { valor: nombre, cita } },
+    operacion: operacionArt18(),
+    documentos: [doc]
+  })
+
+  await post(`/api/capturar/${id}`, {
+    rol: 'oficial', texto: FUENTE_ART18,
+    extraccion: base('Juan Pérez González', 'El titular es Juan Pérez González')
+  })
+  await post(`/api/capturar/${id}`, {
+    rol: 'oficial',
+    texto: FUENTE_ART18.replace('El titular es Juan Pérez González',
+                                'Según la carta laboral el titular es María Gómez Batista'),
+    extraccion: base('María Gómez Batista', 'el titular es María Gómez Batista')
+  })
+  return id
 }
 
 const post = (ruta, cuerpo, cabeceras = {}) =>
@@ -166,8 +201,11 @@ test('UI-10 · la tableta de la sucursal SÍ escribe, con su propio origen', asy
   // El guardián deduce el origen legítimo de la cabecera Host. Comparar contra
   // un literal 127.0.0.1 dejaba fuera al único dispositivo para el que se abre
   // el servidor a la red.
-  const r = await post('/api/decidir/EXP-002', { que: 'aprobar', oficial: 'x', motivo: 'y' },
+  const r = await post('/api/decidir/EXP-002',
+                       { que: 'aprobar', rol: 'aprobador', oficial: 'R. Arias', motivo: 'y' },
                        { origin: BASE })
+  // Puede fallar por el ESTADO del expediente —eso es otra cosa y es legítimo—
+  // pero nunca por venir de donde viene.
   assert.notEqual(r.status, 403, 'el mismo origen nunca se rechaza por origen')
 })
 
@@ -176,12 +214,15 @@ test('UI-10 · la tableta de la sucursal SÍ escribe, con su propio origen', asy
 // ═══════════════════════════════════════════════════════════════════════════
 
 test('UI-11 · resolver exige valor de la disputa, oficial y motivo', async () => {
+  // Con el rol correcto: lo que se prueba aquí son las reglas del NÚCLEO, no
+  // las del control dual. Cada capa se comprueba por separado o no se sabe cuál
+  // rechazó.
   const casos = [
-    [{ campo: 'titular.nombre', valor: 'Pedro Ramírez Him', oficial: 'A. Ruiz', motivo: 'me suena mejor' },
+    [{ campo: 'titular.nombre', valor: 'Pedro Ramírez Him', rol: 'oficial', oficial: 'A. Ruiz', motivo: 'me suena mejor' },
      /no es ninguno de los dos valores/],
-    [{ campo: 'titular.nombre', valor: 'María Gómez Batista', motivo: 'la cédula coincide' },
+    [{ campo: 'titular.nombre', valor: 'María Gómez Batista', rol: 'oficial', motivo: 'la cédula coincide' },
      /exige identificar al oficial/],
-    [{ campo: 'titular.nombre', valor: 'María Gómez Batista', oficial: 'A. Ruiz' },
+    [{ campo: 'titular.nombre', valor: 'María Gómez Batista', rol: 'oficial', oficial: 'A. Ruiz' },
      /exige motivo/]
   ]
   for (const [cuerpo, esperado] of casos) {
@@ -197,7 +238,7 @@ test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async ()
 
   // Con el conflicto abierto, la firma se para en seco.
   const bloqueada = await post('/api/decidir/EXP-003',
-    { que: 'aprobar', oficial: 'R. Him · gerente', motivo: 'conforme' })
+    { que: 'aprobar', rol: 'aprobador', oficial: 'R. Him · gerente', motivo: 'conforme' })
   assert.equal(bloqueada.status, 409)
   assert.match((await bloqueada.json()).error, /se contradicen/)
 
@@ -205,6 +246,7 @@ test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async ()
   const resuelto = await post('/api/resolver/EXP-003', {
     campo: 'titular.nombre',
     valor: 'María Gómez Batista',
+    rol: 'oficial',
     oficial: 'Marta Him · oficial de cuenta',
     motivo: 'La cédula física presentada en ventanilla coincide con la carta laboral.'
   })
@@ -213,7 +255,7 @@ test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async ()
 
   // Y ahora sí.
   const firmada = await post('/api/decidir/EXP-003',
-    { que: 'aprobar', oficial: 'R. Him · gerente de sucursal', motivo: 'Resolución revisada.' })
+    { que: 'aprobar', rol: 'aprobador', oficial: 'R. Him · gerente de sucursal', motivo: 'Resolución revisada.' })
   assert.equal(firmada.status, 200)
   assert.equal((await firmada.json()).estado, 'APROBADO')
 
@@ -223,8 +265,156 @@ test('UI-12 · ⭐ el ciclo completo: resolver y solo entonces firmar', async ()
   assert.ok(despues.cadena.intacta)
 })
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-5 · El control dual — quién puede qué
+//
+//  MAKER-CHECKER: quien prepara el expediente no es quien lo aprueba. Lo que la
+//  banca usa desde Basilea II, y lo que el núcleo ya insinuaba al declarar
+//  APROBADO y RECHAZADO como SOLO_HUMANO — el rol solo añade CUÁL humano.
+//
+//  Se prueba por HTTP y SIN pasar por la interfaz, a propósito: esconder un
+//  botón no es aplicar un rol. Si la separación no vive en el servidor, no vive.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-14 · ⭐ la oficial que arma el expediente NO puede firmarlo', async () => {
+  const r = await post('/api/decidir/EXP-001',
+    { que: 'aprobar', rol: 'oficial', oficial: 'Marta Him', motivo: 'conforme' })
+  assert.equal(r.status, 403)
+  const { error } = await r.json()
+  assert.match(error, /no puede aprobar/)
+  assert.match(error, /control dual, no un fallo/,
+    'el mensaje tiene que decir POR QUÉ, o parece un error del sistema')
+})
+
+test('UI-15 · y el gerente que firma no arma expedientes', async () => {
+  const r = await post('/api/resolver/EXP-003', {
+    campo: 'titular.nombre', valor: 'María Gómez Batista',
+    rol: 'aprobador', oficial: 'R. Arias', motivo: 'x'
+  })
+  assert.equal(r.status, 403)
+  assert.match((await r.json()).error, /no puede resolver/)
+})
+
+test('UI-16 · el auditor lee y no toca — leer no es escribir', async () => {
+  // Este rol existe para demostrar justo eso: un `puede: []` es una posición
+  // legítima, no un rol a medio configurar.
+  const lee = await fetch(`${BASE}/api/expediente/EXP-001`)
+  assert.equal(lee.status, 200, 'leer nunca se le niega a nadie')
+
+  const escribe = await post('/api/decidir/EXP-001',
+    { que: 'aprobar', rol: 'auditor', oficial: 'x', motivo: 'y' })
+  assert.equal(escribe.status, 403)
+  assert.match((await escribe.json()).error, /leer, no escribir/)
+})
+
+test('UI-17 · sin rol declarado no se escribe, y se dice qué falta', async () => {
+  const r = await post('/api/decidir/EXP-001', { que: 'aprobar', oficial: 'x', motivo: 'y' })
+  assert.equal(r.status, 403)
+  assert.match((await r.json()).error, /di con qué rol actúas/)
+})
+
+test('UI-18 · un rol inventado se rechaza diciendo cuáles existen', async () => {
+  const r = await post('/api/decidir/EXP-001',
+    { que: 'aprobar', rol: 'presidente', oficial: 'x', motivo: 'y' })
+  assert.equal(r.status, 403)
+  const { error } = await r.json()
+  assert.match(error, /no existe aquí/)
+  assert.match(error, /oficial.*aprobador.*auditor/s, 'y dice cuáles hay')
+})
+
+test('UI-19 · ⭐ aprobar y rechazar son permisos distintos, no uno solo', async () => {
+  // `decidir` es una ruta y DOS acciones. Un banco puede repartirlas distinto,
+  // y por eso la acción sale de `que` y no de la ruta.
+  const r = await post('/api/decidir/EXP-002',
+    { que: 'rechazar', rol: 'oficial', oficial: 'Marta', motivo: 'no procede' })
+  assert.equal(r.status, 403)
+  assert.match((await r.json()).error, /no puede rechazar/,
+    'el mensaje nombra la acción pedida, no «aprobar» por defecto')
+})
+
+test('UI-20 · ⭐ el ciclo con control dual: Marta prepara, Ricardo firma', async () => {
+  const ID = await expedienteConConflicto('EXP-DUAL')
+
+  const resuelto = await post(`/api/resolver/${ID}`, {
+    campo: 'titular.nombre', valor: 'María Gómez Batista', rol: 'oficial',
+    oficial: 'Marta Him · oficial de cuenta',
+    motivo: 'La cédula física presentada en ventanilla coincide con la carta laboral.'
+  })
+  assert.equal(resuelto.status, 200)
+
+  const firmada = await post(`/api/decidir/${ID}`, {
+    que: 'aprobar', rol: 'aprobador',
+    oficial: 'Ricardo Arias · gerente de sucursal', motivo: 'Resolución revisada.'
+  })
+  assert.equal(firmada.status, 200)
+
+  // Y el ledger guarda a los DOS, que es el punto del control dual.
+  const d = await (await fetch(`${BASE}/api/expediente/${ID}`)).json()
+  assert.match(d.expediente.resoluciones.at(-1).oficial, /Marta/)
+  assert.match(d.expediente.decisiones.at(-1).oficial, /Ricardo/)
+  assert.ok(d.cadena.intacta)
+})
+
 test('UI-13 · el CSV que la interfaz muestra lleva sus columnas de auditoría', async () => {
   const d = await (await fetch(`${BASE}/api/expediente/EXP-001`)).json()
   assert.equal(d.csv.split('\n')[0],
     'expediente,campo,valor,evidencia,cita,desde,hasta,origen,guardias,motivo,firmante')
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-6 · CAPTURAR — lo que le faltaba a la ventanilla para existir
+//
+//  Hasta que existió este endpoint, la interfaz solo sabía leer y decidir sobre
+//  lo ya capturado: para iniciar un expediente había que abrir una terminal.
+//  En una demostración, ese es el momento exacto en que se pierde a la sala.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-21 · ⭐ la oficial inicia un expediente sin tocar la terminal', async () => {
+  const r = await post('/api/capturar/EXP-VENTANILLA', {
+    rol: 'oficial',
+    texto: 'El titular es Ana Ruiz, cédula 8-777-888.'
+  })
+  assert.equal(r.status, 200)
+  const d = await r.json()
+  assert.equal(d.estado, 'CAPTURADO',
+    'sin propuesta del modelo, el expediente queda capturado — y eso es un estado legítimo')
+
+  // Y aparece en la lista, que es lo que ve el resto de la sucursal.
+  const lista = await (await fetch(`${BASE}/api/expedientes`)).json()
+  assert.ok(lista.expedientes.some(e => e.id === 'EXP-VENTANILLA'))
+})
+
+test('UI-22 · capturar con la propuesta del modelo asienta y revisa de una vez', async () => {
+  const r = await post('/api/capturar/EXP-CON-PROPUESTA', {
+    rol: 'oficial',
+    texto: FUENTE_ART18,
+    extraccion: { titular: titularArt18(), operacion: operacionArt18(), documentos: [] }
+  })
+  assert.equal(r.status, 200)
+  const d = await r.json()
+  assert.ok(d.anclados > 10, 'los campos del artículo 18 entran')
+  assert.equal(d.rechazados, 0, 'y ninguno se rechaza: las citas son literales')
+})
+
+test('UI-23 · un identificador que no sirve se rechaza antes de crear nada', async () => {
+  for (const malo of ['../fuera', 'con espacio', '', 'a'.repeat(80)]) {
+    const r = await post(`/api/capturar/${encodeURIComponent(malo)}`,
+                         { rol: 'oficial', texto: 'algo' })
+    assert.ok(r.status === 400 || r.status === 404,
+      `"${malo}" no puede crear un expediente`)
+  }
+})
+
+test('UI-24 · capturar sin texto no crea un expediente vacío', async () => {
+  const r = await post('/api/capturar/EXP-SIN-TEXTO', { rol: 'oficial', texto: '   ' })
+  assert.equal(r.status, 400)
+  assert.equal(existsSync(join(dir, 'EXP-SIN-TEXTO.jsonl')), false,
+    'y no queda archivo detrás')
+})
+
+test('UI-25 · ⭐ el gerente no captura: es la otra mitad del control dual', async () => {
+  const r = await post('/api/capturar/EXP-GERENTE', { rol: 'aprobador', texto: 'algo' })
+  assert.equal(r.status, 403)
+  assert.match((await r.json()).error, /no puede capturar/)
+  assert.equal(existsSync(join(dir, 'EXP-GERENTE.jsonl')), false)
 })

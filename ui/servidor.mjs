@@ -103,9 +103,60 @@ const servidor = createServer(async (req, res) => {
     }
 
     // ── TODA ESCRITURA PASA POR AQUÍ ANTES QUE POR NINGÚN SITIO ─────────────
+    //
+    // El cuerpo se lee UNA vez y viaja al guardián y al manejador: el rol viene
+    // dentro, y un `req` ya consumido no se puede volver a leer.
+    let cuerpo = null
     if (req.method === 'POST') {
-      const no = escrituraRechazada(req, url)
+      const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim()
+      if (tipo === 'application/json') {
+        try { cuerpo = await leerCuerpo(req) } catch { cuerpo = null }
+      }
+      const no = escrituraRechazada(req, url, cuerpo)
       if (no) return enviar(no.codigo, { ok: false, error: no.error })
+    }
+
+    // ⭐ CAPTURAR — lo que le faltaba a la ventanilla para existir
+    //
+    // Hasta aquí la interfaz solo sabía LEER y decidir sobre lo ya capturado.
+    // Para iniciar un expediente había que abrir una terminal, y ese es
+    // exactamente el momento en que se pierde a quien está mirando.
+    //
+    // Recibe el texto tal cual lo dictó o lo tecleó el oficial, y la propuesta
+    // del modelo si ya la hay. Sin propuesta, el expediente queda CAPTURADO con
+    // su fuente guardada entera — que es un estado legítimo: lo que se dijo ya
+    // está a salvo aunque nadie lo haya interpretado todavía.
+    //
+    // ⚠️ Este endpoint SÍ crea expedientes, y es el único. Por eso no pasa por
+    // la comprobación de existencia del guardián: capturar es, literalmente,
+    // hacer que algo exista. Lo que sí comprueba es el rol.
+    if (url.pathname.startsWith('/api/capturar/') && req.method === 'POST') {
+      const id = decodeURIComponent(url.pathname.split('/').pop())
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(id)) {
+        return enviar(400, { ok: false, error: `"${id}" no sirve como identificador de expediente` })
+      }
+      const texto = String(cuerpo?.texto ?? '').trim()
+      if (!texto) return enviar(400, { ok: false, error: 'capturar necesita el texto de la fuente' })
+
+      const exp = abrirExpediente({
+        ruta: join(DATOS, `${id}.jsonl`), esquema, id,
+        guardiasDominio: dominio.revisar, guardiasRegistro: dominio.revisarRegistro,
+        contextoDominio: dominio.contexto
+      })
+      try {
+        exp.capturar(texto)
+        // La propuesta del modelo es opcional: se puede capturar primero y
+        // asentar después, que es como funciona una ventanilla de verdad.
+        const revision = cuerpo?.extraccion ? exp.asentar(cuerpo.extraccion).revision : null
+        const e = exp.leer()
+        return enviar(200, {
+          ok: true, id, estado: e.estado,
+          anclados: revision ? revision.resumen.aceptados : 0,
+          rechazados: revision ? revision.resumen.rechazados : 0
+        })
+      } catch (err) {
+        return enviar(409, { ok: false, error: err.message })
+      }
     }
 
     // ⭐ Resolver un conflicto entre fuentes: el humano en el bucle, desde el
@@ -114,7 +165,6 @@ const servidor = createServer(async (req, res) => {
     // servidor, tarde o temprano las dos copias dirían cosas distintas.
     if (url.pathname.startsWith('/api/resolver/') && req.method === 'POST') {
       const id = decodeURIComponent(url.pathname.split('/').pop())
-      const cuerpo = await leerCuerpo(req)
       const exp = abrirExpediente({
         ruta: join(DATOS, `${id}.jsonl`), esquema, id,
         guardiasDominio: dominio.revisar, guardiasRegistro: dominio.revisarRegistro,
@@ -134,7 +184,6 @@ const servidor = createServer(async (req, res) => {
     // ningún otro sitio: la política vive en core/estado.mjs, no en el navegador.
     if (url.pathname.startsWith('/api/decidir/') && req.method === 'POST') {
       const id = decodeURIComponent(url.pathname.split('/').pop())
-      const cuerpo = await leerCuerpo(req)
       const exp = abrirExpediente({
         ruta: join(DATOS, `${id}.jsonl`), esquema, id,
         guardiasDominio: dominio.revisar, guardiasRegistro: dominio.revisarRegistro,
@@ -221,7 +270,7 @@ function resumir (e) {
  * Lo que sí impide es que una página web ajena escriba en el expediente sin
  * que nadie de la sucursal haya tocado nada, que era lo que pasaba.
  */
-function escrituraRechazada (req, url) {
+function escrituraRechazada (req, url, cuerpo) {
   // 1 · Solo JSON. Cierra la vía de la petición «simple» sin comprobación previa.
   const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim()
   if (tipo !== 'application/json') {
@@ -249,11 +298,71 @@ function escrituraRechazada (req, url) {
   // 3 · Un POST NO crea expedientes. Escribir sobre lo que no existe creaba un
   //     ledger cuyo primer hecho era una firma humana que nadie firmó.
   const id = decodeURIComponent(url.pathname.split('/').pop())
-  if (!existsSync(join(DATOS, `${id}.jsonl`))) {
+  // `capturar` es la excepción declarada: es el único que puede crear, porque
+  // capturar ES hacer que algo exista. Todo lo demás escribe sobre lo que ya hay.
+  const esCaptura = url.pathname.startsWith('/api/capturar/')
+  if (!esCaptura && !existsSync(join(DATOS, `${id}.jsonl`))) {
     return { codigo: 404, error: `no existe el expediente ${id}: una decisión no lo crea` }
+  }
+
+  // 4 · ── EL ROL, Y AQUÍ ES DONDE TIENE QUE ESTAR ──────────────────────────
+  //
+  // Esconder el botón NO es aplicar un rol: es disimularlo. Cualquiera con la
+  // dirección puede llamar a la API sin abrir la interfaz —de hecho, así lo
+  // prueba la suite—, así que la separación de funciones vive aquí o no vive.
+  //
+  // Quién puede qué lo dice el ESQUEMA (`instancias/banca/esquema.json`), no
+  // este archivo. El servidor solo comprueba lo que el esquema declara.
+  //
+  // Un esquema SIN roles no limita a nadie: es como se comportaba antes de que
+  // esto existiera, y el de salud no tiene ventanilla que separar.
+  //
+  // ⚠️ Y se dice lo que NO es: esto no autentica. Nadie comprueba que quien
+  // dice ser Marta lo sea. Impide que un rol haga lo que su rol no hace, que
+  // es más modesto y también más honesto.
+  const roles = esquema.roles ?? {}
+  if (Object.keys(roles).filter(r => !r.startsWith('$')).length) {
+    // `decidir` no es una acción: son dos. Un banco puede querer que el mismo
+    // rol apruebe y rechace, o que rechazar esté más repartido que aprobar —y
+    // el esquema tiene que poder decirlo. Por eso la acción sale de `que`.
+    const ruta = url.pathname.split('/')[2]
+    const accion = ruta === 'decidir'
+      ? String(cuerpo?.que ?? '').trim() || 'aprobar'
+      : ACCION_DE_RUTA[ruta]
+    const rol = String(cuerpo?.rol ?? '').trim()
+    if (accion) {
+      if (!rol) {
+        return { codigo: 403, error: `esta sucursal separa funciones: di con qué rol actúas para ${accion}` }
+      }
+      const decl = roles[rol]
+      if (!decl) {
+        const hay = Object.keys(roles).filter(r => !r.startsWith('$'))
+        return { codigo: 403, error: `el rol "${rol}" no existe aquí. Los declarados: ${hay.join(', ')}` }
+      }
+      if (!decl.puede.includes(accion)) {
+        return {
+          codigo: 403,
+          error: `${decl.titulo ?? rol} no puede ${accion}` +
+                 (decl.puede.length ? `: su función es ${decl.puede.join(', ')}` : ': su función es leer, no escribir') +
+                 '. Es control dual, no un fallo.'
+        }
+      }
+    }
   }
   return null
 }
+
+/**
+ * Qué acción del esquema corresponde a cada ruta de escritura.
+ *
+ * `decidir` NO está aquí: se resuelve arriba a partir de `cuerpo.que`, porque
+ * aprobar y rechazar son dos permisos distintos y un banco tiene derecho a
+ * repartirlos de forma distinta.
+ */
+const ACCION_DE_RUTA = Object.freeze({
+  resolver: 'resolver',
+  capturar: 'capturar'
+})
 
 function leerCuerpo (req) {
   return new Promise((resolver, rechazar) => {

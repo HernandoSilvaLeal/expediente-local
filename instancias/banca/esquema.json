@@ -293,5 +293,46 @@
       "Lo que no aparece aquí, no vence."
     ],
     "documentos[].fecha_emision": 90
+  },
+  "roles": {
+    "$comentario": [
+      "QUIÉN puede provocar QUÉ. Es DATO y no código por la misma razón que las",
+      "unidades y los plazos de vigencia: la respuesta cambia de un banco a otro y",
+      "de una sucursal a otra, y decidirlo en código obliga a tocar el programa",
+      "para reorganizar una ventanilla.",
+      "",
+      "La separación no la inventamos: es MAKER-CHECKER (o control dual, o",
+      "«cuatro ojos»), lo que la banca usa desde Basilea II. Quien prepara el",
+      "expediente no es quien lo aprueba.",
+      "",
+      "Y encaja con lo que el núcleo ya declaraba: core/estado.mjs dice que",
+      "APROBADO y RECHAZADO son SOLO_HUMANO. El rol solo añade CUÁL humano.",
+      "",
+      "AVISO, y va también en la interfaz: esto NO es autenticación. Nadie",
+      "comprueba que quien dice ser Marta lo sea. Lo que impide es que un rol",
+      "haga lo que su rol no hace, que es una cosa distinta y más modesta."
+    ],
+    "oficial": {
+      "titulo": "oficial de cuenta",
+      "puede": [
+        "capturar",
+        "revisar",
+        "resolver"
+      ],
+      "porque": "atiende al cliente en ventanilla y arma el expediente"
+    },
+    "aprobador": {
+      "titulo": "gerente de sucursal",
+      "puede": [
+        "aprobar",
+        "rechazar"
+      ],
+      "porque": "firma la decisión, y por control dual no puede ser quien lo armó"
+    },
+    "auditor": {
+      "titulo": "auditoría interna",
+      "puede": [],
+      "porque": "lee todo y no toca nada: es el rol que demuestra que leer no es escribir"
+    }
   }
 }
