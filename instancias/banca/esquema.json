@@ -91,6 +91,12 @@
     "confianza": "Desconocido"
   },
 
+  "unidades": {
+    "documentos[].monto": "balboas"
+  },
+
+  "$nota_unidades": "Fuera del json_schema a propósito: el json_schema es la gramática que restringe al modelo (llama.cpp lo compila a GBNF); esto es contrato de validación y lo lee G4. Son dos consumidores distintos y mezclarlos ensucia los dos. Panamá usa el balboa a la par con el dólar y en la calle se dicen ambos: los sinónimos están en core/guardias.mjs.",
+
   "campos_criticos": [
     "titular.cedula",
     "documentos[].tipo",

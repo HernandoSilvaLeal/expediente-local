@@ -69,8 +69,23 @@ export function cargarEsquema (rutaRelativa) {
     jsonSchema: js,
     vacios: Object.freeze({ ...crudo.vacios }),
     camposCriticos: Object.freeze([...(crudo.campos_criticos ?? [])]),
+    // Las unidades NO van dentro del json_schema: ese es la gramática que
+    // restringe al modelo. Esto es contrato de validación, que es otra cosa
+    // y la lee otro consumidor (G4).
+    unidades: Object.freeze({ ...(crudo.unidades ?? {}) }),
     ruta: rutaRelativa
   })
+}
+
+/**
+ * Convierte una ruta concreta en la ruta genérica con la que se declaran las
+ * políticas del esquema: `documentos[0].tipo` → `documentos[].tipo`.
+ *
+ * Existe porque `campos_criticos` y `unidades` hablan de "el tipo de CUALQUIER
+ * documento", no del tipo del documento número 3.
+ */
+export function rutaGenerica (ruta) {
+  return String(ruta).replace(/\[\d+\]/g, '[]')
 }
 
 /**
@@ -122,6 +137,52 @@ export function recorrerCampos (obj, visitar, ruta = '') {
 export function esCampo (x) {
   return x !== null && typeof x === 'object' && !Array.isArray(x) &&
          'valor' in x && 'cita' in x
+}
+
+/**
+ * Resuelve `$ref` contra el propio esquema. Solo admite referencias locales
+ * `#/$defs/x`: una referencia remota sería una descarga, y aquí no se descarga nada.
+ */
+export function resolverRef (nodo, raiz) {
+  if (!nodo || typeof nodo !== 'object' || !nodo.$ref) return nodo
+  const m = /^#\/\$defs\/(.+)$/.exec(nodo.$ref)
+  if (!m) throw new Error(`$ref no local: "${nodo.$ref}". Solo se admite "#/$defs/…"`)
+  const destino = raiz.$defs?.[m[1]]
+  if (!destino) throw new Error(`$ref rota: "${nodo.$ref}" no existe en $defs`)
+  return destino
+}
+
+/**
+ * Devuelve la especificación que el esquema declara para una ruta concreta.
+ *
+ *   specDeCampo(esq, 'titular.nombre')      → la definición de campoTexto
+ *   specDeCampo(esq, 'documentos[0].monto') → la definición de campoNumero
+ *
+ * Es lo que permite que las guardias sean GENÉRICAS: no saben qué es un
+ * expediente bancario, le preguntan al esquema qué esperaba en esa ruta.
+ * Devuelve `undefined` si la ruta no está declarada — y eso es un dato: significa
+ * que el modelo devolvió un campo que nadie le pidió.
+ */
+export function specDeCampo (esquema, ruta) {
+  const raiz = esquema.jsonSchema?.schema ?? esquema
+  let nodo = raiz
+
+  for (const parte of ruta.split('.')) {
+    if (!nodo) return undefined
+    const m = /^(.+?)\[(\d+)\]$/.exec(parte)
+    const nombre = m ? m[1] : parte
+
+    nodo = resolverRef(nodo, raiz)
+    nodo = nodo.properties?.[nombre]
+    if (!nodo) return undefined
+    nodo = resolverRef(nodo, raiz)
+
+    if (m) {                              // había índice: bajamos al elemento
+      if (nodo.type !== 'array' || !nodo.items) return undefined
+      nodo = resolverRef(nodo.items, raiz)
+    }
+  }
+  return nodo
 }
 
 /** Lee una ruta con puntos y corchetes: "documentos[0].tipo" */
