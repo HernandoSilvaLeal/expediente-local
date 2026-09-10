@@ -81,7 +81,7 @@ export function cargarEsquema (rutaRelativa) {
     // Quién puede provocar qué. Dato, no código: ver el $comentario del esquema.
     // Un esquema sin roles es legítimo —el de salud no tiene ventanilla— y
     // entonces nadie está limitado, que es como se comportaba antes de existir.
-    roles: Object.freeze({ ...(crudo.roles ?? {}) }),
+    roles: validarRoles(crudo.roles),
     // La identidad del registro, para deduplicar. Si el esquema no la declara,
     // core/dedup.mjs cae al primer campo crítico.
     claveNatural: Object.freeze([...(crudo.clave_natural ?? [])]),
@@ -103,6 +103,47 @@ export function cargarEsquema (rutaRelativa) {
  * Existe porque `campos_criticos` y `unidades` hablan de "el tipo de CUALQUIER
  * documento", no del tipo del documento número 3.
  */
+/**
+ * ── UN ESQUEMA MAL FORMADO REVIENTA AL ARRANCAR, NO TRES HORAS DESPUÉS ──────
+ *
+ * `roles` se guardaba con un `Object.freeze({...})` y cero validación, mientras
+ * este mismo archivo recorre el JSON Schema entero exigiendo
+ * `additionalProperties: false`. Contra su propia doctrina.
+ *
+ * Lo que eso costaba, encontrado por una auditoría adversarial: si `puede` es
+ * un TEXTO en vez de una lista, `decl.puede.includes(accion)` deja de ser
+ * `Array.includes` y pasa a ser `String.includes` — subcadena. Un valor que
+ * dice literalmente «capturar, revisar, resolver y NO aprobar» **concede
+ * aprobar**, porque la palabra está dentro.
+ *
+ * Y el $comentario del esquema INVITA al banco a editar estos roles como dato.
+ * Invitar a editar sin validar es poner la trampa y señalarla.
+ */
+function validarRoles (crudo) {
+  if (crudo === undefined) return Object.freeze({})
+  if (crudo === null || typeof crudo !== 'object' || Array.isArray(crudo)) {
+    throw new Error('`roles` tiene que ser un objeto de rol → { puede: [...] }')
+  }
+
+  const salida = {}
+  for (const [id, decl] of Object.entries(crudo)) {
+    if (id.startsWith('$')) continue          // $comentario y compañía son documentación
+    if (!decl || typeof decl !== 'object' || Array.isArray(decl)) {
+      throw new Error(`el rol "${id}" tiene que ser un objeto con \`puede\``)
+    }
+    if (!Array.isArray(decl.puede)) {
+      throw new Error(
+        `el rol "${id}" declara \`puede\` como ${typeof decl.puede}, y tiene que ser una LISTA. ` +
+        'Con un texto, «NO aprobar» concedería aprobar: `includes` sobre una cadena busca subcadenas.')
+    }
+    if (decl.puede.some(a => typeof a !== 'string' || !a.trim())) {
+      throw new Error(`el rol "${id}" tiene una acción que no es un texto con contenido`)
+    }
+    salida[id] = Object.freeze({ ...decl, puede: Object.freeze([...decl.puede]) })
+  }
+  return Object.freeze(salida)
+}
+
 export function rutaGenerica (ruta) {
   return String(ruta).replace(/\[\d+\]/g, '[]')
 }

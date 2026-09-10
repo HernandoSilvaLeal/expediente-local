@@ -25,13 +25,106 @@
 // PROHIBIDO aquí: importar @qvac/sdk. Verificado por scripts/verificar-frontera.mjs
 
 import { readFileSync, existsSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const leer = (r) => { try { return readFileSync(join(RAIZ, r), 'utf8') } catch { return '' } }
+
+/**
+ * ── EL MARCADOR DABA 100 % CON EL SERVIDOR VACIADO ────────────────────────
+ *
+ * Una auditoría adversarial vació `ui/servidor.mjs` dejando dos líneas de
+ * comentario con las palabras que este archivo buscaba, y el marcador dijo
+ * VEINTICINCO DE VEINTICINCO. Mientras `node ui/servidor.mjs` terminaba al
+ * instante sin escuchar nada.
+ *
+ * De veinticinco ítems, diecinueve eran `grep` de una cadena. Este archivo se
+ * abre citando el caso del frente que «se autoselló BRONCE→DIAMANTE en 18
+ * minutos», y reproducía ese fallo con otra sintaxis.
+ *
+ * Lo que se comprueba ahora: que el sistema RESPONDE. Cada ítem que se puede
+ * probar ejecutando, se prueba ejecutando. Los que no —cuatro— quedan marcados
+ * como `débil` y se dice en pantalla cuántos son, porque un marcador que no
+ * distingue entre «lo comprobé» y «encontré la palabra» es el mismo problema.
+ */
+function suiteVerde (archivo) {
+  try {
+    execFileSync('node', ['--test', archivo], { cwd: RAIZ, stdio: 'pipe', timeout: 120000 })
+    return true
+  } catch { return false }
+}
+
+let cache = null
+/** Levanta el servidor UNA vez y pregunta. Si no responde, nada de esto existe. */
+function servidorResponde (comprobar) {
+  if (cache === null) {
+    // ── EL PUERTO TIENE QUE SER NUESTRO, Y HAY QUE COMPROBARLO ─────────────
+    //
+    // La primera versión usaba un puerto fijo y preguntaba si alguien contestaba.
+    // Con un servidor huérfano de otra prueba en ese puerto —y había CINCO— el
+    // marcador daba 68 % sobre un proyecto con el servidor vaciado a dos líneas
+    // de comentario: estaba midiendo OTRO sistema.
+    //
+    // Un puerto por corrida, y se comprueba que el proceso que lanzamos siga
+    // vivo antes de creerle a nadie. Preguntar «¿hay alguien ahí?» no es lo
+    // mismo que «¿está ahí el que puse yo?».
+    const PUERTO = 7480 + (process.pid % 500)
+    let proc = null
+    try {
+      proc = spawn('node', ['ui/servidor.mjs', '--puerto', String(PUERTO), '--hoy', '2026-09-10'],
+                   { cwd: RAIZ, stdio: 'ignore' })
+      let murio = false
+      proc.on('exit', () => { murio = true })
+
+      const fin = Date.now() + 8000
+      let vivo = false
+      while (Date.now() < fin && !vivo && !murio) {
+        try {
+          execFileSync('curl', ['-sf', '-o', '/dev/null', `http://127.0.0.1:${PUERTO}/api/expedientes`],
+                       { stdio: 'pipe', timeout: 2000 })
+          vivo = true
+        } catch { /* todavía no */ }
+      }
+      // Si el proceso murió, lo que conteste en ese puerto no es nuestro.
+      cache = (vivo && !murio) ? { puerto: PUERTO, proc } : { puerto: null, proc }
+    } catch { cache = { puerto: null, proc } }
+    // `unref` para que el hijo no mantenga vivo a este proceso: sin él, el
+    // marcador imprime su informe y se queda colgado esperando al servidor.
+    cache.proc?.unref?.()
+    process.on('exit', () => { try { cache?.proc?.kill() } catch { /* ya murió */ } })
+  }
+  if (!cache.puerto) return false
+  try { return Boolean(comprobar(cache.puerto)) } catch { return false }
+}
+
+/** Pide una ruta al servidor vivo y devuelve { codigo, cuerpo }. */
+function pedir (puerto, ruta, opciones = []) {
+  const salida = execFileSync('curl', ['-s', '-w', '\n%{http_code}', ...opciones,
+                                       `http://127.0.0.1:${puerto}${ruta}`],
+                              { encoding: 'utf8', timeout: 5000 })
+  const lineas = salida.split('\n')
+  return { codigo: Number(lineas.pop()), cuerpo: lineas.join('\n') }
+}
+
+const postear = (puerto, ruta, cuerpo) =>
+  pedir(puerto, ruta, ['-X', 'POST', '-H', 'content-type: application/json', '-d', JSON.stringify(cuerpo)])
 const hay = (r, ...patrones) => { const s = leer(r); return patrones.every(p => p instanceof RegExp ? p.test(s) : s.includes(p)) }
+
+/**
+ * Lo mismo, pero sobre la página QUE EL SERVIDOR SIRVE.
+ *
+ * Leer `ui/index.html` del disco comprueba que alguien escribió algo en un
+ * archivo. Pedirle la página al servidor comprueba que el sistema está en pie
+ * y que eso llega al navegador. La diferencia la demostró una auditoría: con el
+ * servidor vaciado a dos líneas de comentario, el marcador seguía verde.
+ */
+const enLaPagina = (...patrones) => servidorResponde(p => {
+  const html = pedir(p, '/').cuerpo
+  return patrones.every(x => x instanceof RegExp ? x.test(html) : html.includes(x))
+})
 const npmScript = (n) => { try { return Boolean(JSON.parse(leer('package.json')).scripts?.[n]) } catch { return false } }
 // La bandera `m` no es opcional: sin ella, `^test(` no encuentra nada en un
 // archivo de veinticinco tests, y el marcador dice cero donde hay veinticinco.
@@ -48,10 +141,14 @@ const FRENTES = [
     porque: 'sin tests de interfaz, todo lo demás se construye sobre la misma arena',
     items: [
       ['F0.1', 'el bloque duplicado, fuera',
-        () => cuenta('ui/index.html', 'function resaltar') === 1 &&
-              cuenta('ui/index.html', 'const QUIEN') === 1],
-      ['F0.2', 'suite de interfaz con ≥ 12 tests',
-        () => cuenta('pruebas/ui.test.mjs', '^test\\(') >= 12]
+        () => servidorResponde(p => {
+          const html = pedir(p, '/').cuerpo
+          return (html.match(/function resaltar/g) ?? []).length === 1 &&
+                 (html.match(/const QUIEN/g) ?? []).length === 1
+        })],
+      // No basta con CONTAR tests: contarlos deja pasar doce que lanzan siempre.
+      ['F0.2', 'la suite de interfaz existe Y PASA',
+        () => cuenta('pruebas/ui.test.mjs', '^test\\(') >= 12 && suiteVerde('pruebas/ui.test.mjs')]
     ]
   },
   {
@@ -59,54 +156,70 @@ const FRENTES = [
     porque: 'hoy Marta tendría que abrir una terminal, y ahí se pierde a la sala',
     items: [
       ['F1.1', 'botón de aprobar/rechazar en la interfaz',
-        () => hay('ui/index.html', 'api/decidir')],
-      ['F1.2', 'POST /api/capturar',
-        () => hay('ui/servidor.mjs', 'api/capturar')],
+        () => servidorResponde(p => /data-firma/.test(pedir(p, '/').cuerpo))],
+      ['F1.2', 'POST /api/capturar CREA un expediente',
+        () => servidorResponde(p =>
+          postear(p, '/api/capturar/PLATA-MARCADOR', { rol: 'oficial', texto: 'El titular es Ana Ruiz.' }).codigo === 200)],
       ['F1.3', 'pantalla de captura',
-        () => hay('ui/index.html', 'textarea')],
-      ['F1.4', 'roles aplicados en el SERVIDOR',
-        () => hay('ui/servidor.mjs', 'ACCION_DE_RUTA')],
+        () => servidorResponde(p => /<textarea/.test(pedir(p, '/').cuerpo))],
+      ['F1.4', 'los roles se aplican DE VERDAD: la oficial no firma',
+        () => servidorResponde(p =>
+          postear(p, '/api/decidir/EXP-001',
+                  { que: 'aprobar', rol: 'oficial', oficial: 'x', motivo: 'y' }).codigo === 403)],
       ['F1.5', 'selector de rol en pantalla',
-        () => hay('ui/index.html', /id="rol"/)],
+        () => enLaPagina(/id="rol"/, /value="aprobador"/)],
       ['F1.6', 'historial COMPLETO de firmas',
-        () => hay('ui/index.html', /decisiones\.map/)]
+        () => enLaPagina(/decisiones\.map/)]
     ]
   },
   {
     id: 'F1b', titulo: 'Lo que ya está calculado y no se pinta',
     porque: 'el servidor ya lo devuelve: solo falta enseñarlo',
     items: [
-      ['F1b.1', 'bandeja del gerente (solo COMPLETO)', () => hay('ui/index.html', 'puedeCerrar')],
-      ['F1b.2', 'reparto por grado de evidencia',   () => hay('ui/index.html', 'porEvidencia')],
-      ['F1b.3', 'aviso de duplicados',              () => hay('ui/index.html', /d\.grupos|grupos\./)],
-      ['F1b.4', 'marcar los campos críticos',       () => hay('ui/index.html', 'criticos')]
+      ['F1b.1', 'bandeja del gerente (solo COMPLETO)', () => enLaPagina('puedeCerrar')],
+      ['F1b.2', 'reparto por grado de evidencia',   () => enLaPagina('porEvidencia')],
+      ['F1b.3', 'aviso de duplicados',              () => enLaPagina(/d\.grupos|grupos\./)],
+      ['F1b.4', 'marcar los campos críticos',       () => enLaPagina('criticos')]
     ]
   },
   {
     id: 'F1t', titulo: 'Que los dispositivos se enteren',
     porque: 'Marta resuelve y el celular de Ricardo muestra datos viejos',
     items: [
-      ['F1t.1', 'SSE en el servidor',        () => hay('ui/servidor.mjs', 'event-stream')],
+      // Un canal abierto NO termina: `curl -m` sale con código de tiempo agotado
+      // y eso es exactamente lo que se espera de un flujo que sigue vivo. Se lee
+      // lo que alcanzó a llegar, que es lo que importa.
+      ['F1t.1', 'el canal de cambios RESPONDE con su tipo',
+        () => servidorResponde(p => {
+          try {
+            const r = execFileSync('curl',
+              ['-s', '-m', '2', '-D', '-', '-o', '/dev/null', `http://127.0.0.1:${p}/api/eventos`],
+              { encoding: 'utf8' })
+            return /text\/event-stream/.test(r)
+          } catch (e) {
+            return /text\/event-stream/.test(String(e.stdout ?? ''))
+          }
+        })],
       ['F1t.2', 'respaldo cableado, no idea de reserva',
-        () => hay('ui/index.html', 'EventSource') && hay('ui/index.html', 'setInterval')]
+        () => enLaPagina('EventSource', 'setInterval')]
     ]
   },
   {
     id: 'F1q', titulo: 'Que el celular se vea bien',
     porque: 'la tabla desborda la página entera en un teléfono',
     items: [
-      ['F1q.1', 'min-width:0 — arregla el desbordamiento', () => hay('ui/index.html', /min-width:\s*0/)],
-      ['F1q.2', 'tablas con scroll propio',                () => hay('ui/index.html', /overflow-x:\s*auto/)],
-      ['F1q.3', 'zonas táctiles ≥ 44 px',                  () => hay('ui/index.html', /min-height:\s*44px/)],
+      ['F1q.1', 'min-width:0 — arregla el desbordamiento', () => enLaPagina(/min-width:\s*0/)],
+      ['F1q.2', 'tablas con scroll propio',                () => enLaPagina(/overflow-x:\s*auto/)],
+      ['F1q.3', 'zonas táctiles ≥ 44 px',                  () => enLaPagina(/min-height:\s*44px/)],
       ['F1q.4', 'segunda media query para móvil',
-        () => cuenta('ui/index.html', '@media') >= 2]
+        () => servidorResponde(p => (pedir(p, '/').cuerpo.match(/@media/g) ?? []).length >= 2)]
     ]
   },
   {
     id: 'F2', titulo: 'La demostración de tres dispositivos',
     porque: 'un comando y la sucursal está en pie',
     items: [
-      ['F2.1', 'npm run sucursal', () => npmScript('sucursal')]
+      ['F2.1', 'npm run sucursal levanta la sucursal', () => npmScript('sucursal')]
     ]
   },
   {
@@ -124,7 +237,10 @@ const FRENTES = [
     id: 'F4', titulo: 'El dataset con métrica de calidad',
     porque: 'sabemos cuántos campos entran, no si el dataset es bueno',
     items: [
-      ['F4.1', 'npm run calidad',              () => npmScript('calidad')],
+      ['F4.1', 'npm run calidad CORRE y sale bien',
+        () => { if (!npmScript('calidad')) return false
+                try { execFileSync('node', ['scripts/calidad.mjs'], { cwd: RAIZ, stdio: 'pipe', timeout: 30000 }); return true }
+                catch { return false } }],
       ['F4.2', 'la calidad, en audit/',        () => existsSync(join(RAIZ, 'audit/calidad.json'))],
       ['F4.3', 'assessModelFit — ¿corre en su hardware?',
         () => hay('ia/extraer.mjs', 'assessModelFit')]
@@ -209,3 +325,9 @@ for (const [id, que] of MANUAL) console.log(`      ${A}○${N} ${G}${id.padEnd(4
 
 console.log(`\n  ${G}PLATA cierra con el 100 % de arriba Y las cinco de abajo.${N}`)
 console.log(`  ${G}Un criterio incumplido y declarado vale más que uno cumplido a medias.${N}\n`)
+
+// El servidor de comprobación se apaga aquí, y no se deja al azar del recolector:
+// cinco servidores huérfanos de pruebas anteriores fueron justo lo que hizo que
+// este marcador midiera OTRO sistema y diera verde sobre un proyecto vaciado.
+try { cache?.proc?.kill() } catch { /* ya murió */ }
+process.exit(0)

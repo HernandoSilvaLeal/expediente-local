@@ -630,6 +630,11 @@ function cablearConflictos (id) {
       const cuerpo = {
         campo: caja.dataset.ruta,
         valor: elegido ? elegido.value : null,
+        // El `rol` se quedó fuera cuando se añadió el control dual, y el botón
+        // central de la demostración llevaba roto desde entonces con la suite
+        // entera en verde: los tests llamaban a la API poniendo el rol A MANO,
+        // así que probaban el servidor y no lo que la página envía.
+        rol: rol(),
         oficial: caja.querySelector('[data-of]').value,
         motivo: caja.querySelector('[data-mot]').value
       }

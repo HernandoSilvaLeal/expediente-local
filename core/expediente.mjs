@@ -23,7 +23,7 @@ import { revisar } from './guardias.mjs'
 import { rutaGenerica, EVIDENCIA, nivelEvidencia } from './esquema.mjs'
 import { EVENTO, registrar, leer, verificarCadena } from './ledger.mjs'
 import { proyectar } from './proyeccion.mjs'
-import { ESTADOS, ORIGENES, esLegal } from './estado.mjs'
+import { ESTADOS, ORIGENES, esLegal, TERMINALES } from './estado.mjs'
 
 /**
  * Abre un expediente sobre un ledger.
@@ -81,6 +81,39 @@ export function abrirExpediente ({
 
   const estadoActual = () => proyectar(leer(ruta)).estado
 
+  /**
+   * ── UN EXPEDIENTE FIRMADO NO SE TOCA ──────────────────────────────────────
+   *
+   * `core/estado.mjs` declara APROBADO y RECHAZADO como terminales: `[]`, sin
+   * ninguna transición de salida. Pero eso solo lo miraba `decidir()`, que es
+   * quien transita. `capturar`, `asentar` y `resolver` NO transitan, así que
+   * pasaban por encima sin preguntar.
+   *
+   * Lo encontró una auditoría adversarial, y el escenario es el peor posible:
+   * el rol OFICIAL —el que por control dual no puede firmar— reescribía el
+   * titular de un expediente ya APROBADO, y el CSV de auditoría atribuía el
+   * valor nuevo al gerente que nunca lo vio. La cadena de hashes seguía
+   * intacta, porque los hechos son legítimos uno a uno: lo que no era legítimo
+   * es que ocurrieran después de la firma.
+   *
+   * Hasta que la interfaz pudo capturar, no había forma de llegar ahí desde el
+   * navegador. Abrirla destapó el hueco — y el control dual, que se presentó
+   * como el candado, no lo cerraba.
+   *
+   * Terminal significa terminal: si hay que corregir algo firmado, se abre otro
+   * expediente y se enlaza. Reescribir lo firmado no es corregir, es borrar sin
+   * borrar.
+   */
+  const exigirNoTerminal = (que) => {
+    const estado = estadoActual()
+    if (TERMINALES.includes(estado)) {
+      throw new Error(
+        `No se puede ${que} sobre un expediente en estado ${estado}: es terminal y ya está firmado. ` +
+        'Para corregir algo firmado se abre un expediente nuevo y se enlaza — reescribir lo firmado ' +
+        'no es corregir.')
+    }
+  }
+
   /** Solo transita si la transición es legal. Devuelve si la hizo. */
   const transitarSiPuede = (hacia, origen, motivo = null) => {
     const desde = estadoActual()
@@ -101,6 +134,7 @@ export function abrirExpediente ({
       if (typeof texto !== 'string' || !texto.trim()) {
         throw new Error('capturar() necesita un texto no vacío')
       }
+      exigirNoTerminal('capturar')
       hecho(EVENTO.CAPTURA, { origen, datos: { texto, medio } })
       return this.leer()
     },
@@ -118,6 +152,7 @@ export function abrirExpediente ({
      * rechazo es la evidencia de que las guardias hicieron algo.
      */
     asentar (extraido, { origen = ORIGENES.LLM_LOCAL } = {}) {
+      exigirNoTerminal('asentar')
       const exp = proyectar(leer(ruta))
       const fuente = exp.fuentes.map(f => f.texto).join('\n')
       if (!fuente) throw new Error('No se puede asentar sin haber capturado antes: no hay fuente contra la que anclar')
@@ -263,6 +298,7 @@ export function abrirExpediente ({
      *     qué vio el oficial que el sistema no podía ver.
      */
     resolver (rutaCampo, { valor, oficial = null, motivo = null } = {}) {
+      exigirNoTerminal('resolver')
       const exp = proyectar(leer(ruta))
       const conflicto = (exp.conflictos ?? []).find(c => c.ruta === rutaCampo)
       if (!conflicto) {

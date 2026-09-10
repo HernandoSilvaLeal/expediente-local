@@ -553,3 +553,94 @@ test('UI-32 · el aviso NO lleva los datos, solo dice que algo cambió', async (
   const payload = JSON.parse(datos)
   assert.deepEqual(Object.keys(payload), ['que'], 'solo dice QUÉ pasó, no el expediente entero')
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI-9 · LO QUE ENCONTRÓ EL ADVERSARIAL
+//
+//  Trece hallazgos, cinco críticos, sobre código escrito el mismo día. Cada
+//  uno queda fijado aquí para que no vuelva por otra puerta.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test('UI-33 · ⭐ un expediente FIRMADO no se reescribe — ni capturando, ni resolviendo', async () => {
+  // El peor de los trece. El rol OFICIAL —el que por control dual no puede
+  // firmar— reescribía el titular de un expediente ya APROBADO, y el CSV de
+  // auditoría atribuía el valor nuevo al gerente que nunca lo vio. La cadena
+  // seguía intacta, porque cada hecho era legítimo por separado: lo que no era
+  // legítimo es que ocurrieran DESPUÉS de la firma.
+  const id = await expedienteConConflicto('EXP-TERMINAL')
+  await post(`/api/resolver/${id}`, {
+    campo: 'titular.nombre', valor: 'María Gómez Batista', rol: 'oficial',
+    oficial: 'Marta Him', motivo: 'la cédula coincide'
+  })
+  const firmada = await post(`/api/decidir/${id}`,
+    { que: 'aprobar', rol: 'aprobador', oficial: 'R. Arias', motivo: 'conforme' })
+  assert.equal(firmada.status, 200)
+
+  // Y a partir de aquí, no se toca.
+  const reescribir = await post(`/api/capturar/${id}`, {
+    rol: 'oficial', texto: 'El titular es Fulano Testaferro Blanqueador.'
+  })
+  assert.equal(reescribir.status, 409)
+  assert.match((await reescribir.json()).error, /terminal y ya está firmado/)
+
+  const d = await (await fetch(`${BASE}/api/expediente/${id}`)).json()
+  assert.equal(d.expediente.campos['titular.nombre'].valor, 'María Gómez Batista',
+    'el titular firmado sigue siendo el firmado')
+})
+
+test('UI-34 · ⭐ el botón de resolver manda el rol — se prueba lo que la PÁGINA envía', async () => {
+  // El botón central de la demostración llevaba roto desde que se añadió el
+  // control dual: la página no mandaba `rol` y el servidor devolvía 403. Con la
+  // suite entera en verde, porque los tests llamaban a la API poniendo el rol A
+  // MANO. Probaban el servidor, no la página.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+
+  // Se extrae el cuerpo que arma el manejador de resolver y se comprueba que
+  // incluye el rol. No es un clic, pero sí es lo que el clic va a enviar.
+  const bloque = js.slice(js.indexOf('function cablearConflictos'))
+  const cuerpo = bloque.slice(bloque.indexOf('const cuerpo = {'), bloque.indexOf('}', bloque.indexOf('const cuerpo = {')))
+  assert.match(cuerpo, /rol:/, 'el cuerpo que envía el botón tiene que llevar rol')
+
+  // Y las tres zonas de escritura de la página, todas.
+  for (const fn of ['cablearConflictos', 'cablearFirma', 'pintarCaptura']) {
+    const trozo = js.slice(js.indexOf(`function ${fn}`), js.indexOf(`function ${fn}`) + 2200)
+    assert.match(trozo, /rol\(\)/, `${fn} tiene que mandar el rol`)
+  }
+})
+
+test('UI-35 · un rol raro no revienta el servidor: 403, no 500', async () => {
+  // `roles[rol]` sobre `__proto__` devolvía algo truthy sin `puede`, y el
+  // servidor contestaba 500 con su traza interna. Fallaba cerrado por
+  // casualidad, no por diseño.
+  for (const rol of ['__proto__', 'constructor', 'toString', '$comentario']) {
+    const r = await post('/api/decidir/EXP-002',
+      { que: 'aprobar', rol, oficial: 'x', motivo: 'y' })
+    assert.equal(r.status, 403, `${rol} tiene que dar 403`)
+    assert.match((await r.json()).error, /no existe aquí/)
+  }
+})
+
+test('UI-36 · el rol se comprueba por TIPO, no se coacciona', async () => {
+  // Con `String(cuerpo.rol)`, un `["aprobador"]` se convertía en el rol
+  // «aprobador» y pasaba. Una puerta que acepta cualquier cosa y la interpreta
+  // no es una puerta.
+  for (const rol of [['aprobador'], { rol: 'aprobador' }, 42, true]) {
+    const r = await post('/api/decidir/EXP-002',
+      { que: 'aprobar', rol, oficial: 'x', motivo: 'y' })
+    assert.equal(r.status, 403, `${JSON.stringify(rol)} no es un rol`)
+    assert.match((await r.json()).error, /di con qué rol actúas/)
+  }
+})
+
+test('UI-37 · ⭐ no se lee cualquier .jsonl del disco', async () => {
+  // `capturar` validaba el identificador; ver, resolver y decidir no. Un
+  // `..%2ffuera%2fSECRETO` leía cualquier archivo del equipo — y el servidor
+  // está pensado para abrirse a la red de la sucursal sin autenticación.
+  for (const malo of ['..%2ffuera%2fSECRETO', '..%2f..%2fetc%2fpasswd', '%2e%2e%2fx']) {
+    const r = await fetch(`${BASE}/api/expediente/${malo}`)
+    assert.equal(r.status, 400, `${malo} tiene que morir en la puerta, no en el núcleo`)
+  }
+  // Y lo legítimo sigue pasando.
+  assert.equal((await fetch(`${BASE}/api/expediente/EXP-001`)).status, 200)
+})

@@ -54,6 +54,25 @@ const esquema = cargarEsquema(arg('esquema', 'instancias/banca/esquema.json'))
 const hoy = arg('hoy', null) ? new Date(`${arg('hoy')}T12:00:00Z`) : new Date()
 const dominio = await cargarDominio(esquema, { hoy })
 
+/**
+ * Qué sirve como identificador de expediente.
+ *
+ * ── SE APLICA EN TODAS LAS RUTAS, Y ANTES NO ──────────────────────────────
+ *
+ * `capturar` validaba el identificador y bloqueaba todo intento de salirse del
+ * directorio. Las otras tres rutas —ver, resolver, decidir— hacían
+ * `join(DATOS, id + '.jsonl')` con lo que llegara, así que
+ * `..%2ffuera%2fSECRETO` LEÍA cualquier .jsonl del disco. Lo encontró una
+ * auditoría adversarial.
+ *
+ * Y el servidor está pensado para abrirse a la red de la sucursal sin
+ * autenticación: cualquiera en esa red leía cualquier expediente del equipo.
+ *
+ * Que la ESCRITURA no se colara fue casualidad —la comprobación de dueño del
+ * ledger la paraba— y una defensa por casualidad no es una defensa.
+ */
+const ID_VALIDO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' }
 
@@ -91,6 +110,20 @@ const servidor = createServer(async (req, res) => {
   try {
     if (url.pathname === '/' || url.pathname === '/index.html') {
       return enviar(200, readFileSync(join(AQUI, 'index.html'), 'utf8'), TIPOS['.html'])
+    }
+
+    // ── EL IDENTIFICADOR, ANTES DE TOCAR EL DISCO ───────────────────────────
+    // Una sola comprobación para las cuatro rutas: tenerla en una sola de ellas
+    // es exactamente cómo se abrió el agujero. Y va ANTES de todos los
+    // manejadores: la primera versión quedó DEBAJO del que debía proteger, así
+    // que el traversal seguía muriendo en el núcleo y no en la puerta. Una
+    // defensa que funciona por el orden accidental de un archivo no es una
+    // defensa: es suerte con comentario.
+    if (/^\/api\/(expediente|capturar|resolver|decidir)\//.test(url.pathname)) {
+      const id = decodeURIComponent(url.pathname.split('/').pop())
+      if (!ID_VALIDO.test(id)) {
+        return enviar(400, { error: `"${id}" no sirve como identificador de expediente` })
+      }
     }
 
     if (url.pathname === '/api/expedientes') {
@@ -178,9 +211,6 @@ const servidor = createServer(async (req, res) => {
     // hacer que algo exista. Lo que sí comprueba es el rol.
     if (url.pathname.startsWith('/api/capturar/') && req.method === 'POST') {
       const id = decodeURIComponent(url.pathname.split('/').pop())
-      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(id)) {
-        return enviar(400, { ok: false, error: `"${id}" no sirve como identificador de expediente` })
-      }
       const texto = String(cuerpo?.texto ?? '').trim()
       if (!texto) return enviar(400, { ok: false, error: 'capturar necesita el texto de la fuente' })
 
@@ -378,12 +408,21 @@ function escrituraRechazada (req, url, cuerpo) {
     const accion = ruta === 'decidir'
       ? String(cuerpo?.que ?? '').trim() || 'aprobar'
       : ACCION_DE_RUTA[ruta]
-    const rol = String(cuerpo?.rol ?? '').trim()
+    // El tipo se COMPRUEBA, no se coacciona: con `String()`, un `["aprobador"]`
+    // se convertía en el rol «aprobador» y la puerta lo dejaba pasar. Una
+    // puerta que acepta cualquier cosa y la interpreta no es una puerta.
+    const crudo = cuerpo?.rol
+    const rol = typeof crudo === 'string' ? crudo.trim() : ''
     if (accion) {
       if (!rol) {
         return { codigo: 403, error: `esta sucursal separa funciones: di con qué rol actúas para ${accion}` }
       }
-      const decl = roles[rol]
+      // `Object.hasOwn` y no `roles[rol]`: con el acceso directo, `__proto__`
+      // devuelve algo truthy sin `puede` y el servidor reventaba con un 500 que
+      // publicaba su traza. Y `$comentario` —que el propio esquema declara como
+      // documentación— se colaba como rol válido, porque el filtro `$` estaba
+      // en el recuento y no en la búsqueda.
+      const decl = Object.hasOwn(roles, rol) && !rol.startsWith('$') ? roles[rol] : null
       if (!decl) {
         const hay = Object.keys(roles).filter(r => !r.startsWith('$'))
         return { codigo: 403, error: `el rol "${rol}" no existe aquí. Los declarados: ${hay.join(', ')}` }

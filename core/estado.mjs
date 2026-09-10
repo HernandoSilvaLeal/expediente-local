@@ -67,6 +67,20 @@ export const ORIGENES = Object.freeze({
 /** Transiciones que SOLO puede provocar una persona. Es política, no técnica. */
 export const SOLO_HUMANO = Object.freeze(['APROBADO', 'RECHAZADO'])
 
+/**
+ * Los estados de los que ya no se sale.
+ *
+ * Se DERIVA de la tabla, no se escribe a mano: si alguien añade un estado
+ * terminal y esta lista fuera literal, quedarían dos fuentes para el mismo
+ * hecho y una acabaría mintiendo. Es el patrón que ya nos mordió dos veces.
+ *
+ * Importa fuera de las transiciones: `capturar`, `asentar` y `resolver` no
+ * transitan, así que pasaban por encima de un expediente firmado sin
+ * preguntar. Terminal tiene que significar terminal para todos.
+ */
+export const TERMINALES = Object.freeze(
+  Object.entries(TRANSICIONES).filter(([, a]) => a.length === 0).map(([de]) => de))
+
 export class TransicionIlegal extends Error {
   constructor (desde, hacia) {
     const posibles = TRANSICIONES[desde]

@@ -6,11 +6,11 @@
 **Por qué existe este archivo:** porque nadie entrega el mapa que hace su propio trabajo fácil
 de auditar, y es exactamente lo que convierte «confíe en mí» en «compruébelo usted».
 
-Regenerado: 2026-09-10T17:38:23.964Z
+Regenerado: 2026-09-10T18:03:01.403Z
 
 | Afirmación | Dónde vive | Evidencia | Comando |
 |---|---|---|---|
-| El núcleo corre sin modelo, sin red y sin el SDK | `core/*` | 356 tests | `npm test` |
+| El núcleo corre sin modelo, sin red y sin el SDK | `core/*` | 361 tests | `npm test` |
 | Hay un test que falla si el núcleo importa el SDK | `scripts/verificar-frontera.mjs` | verificado en positivo y negativo | `npm run test:frontera` |
 | El sistema funciona con la red cortada | `scripts/smoke.mjs` | lo:DOWN, curl→000, JSON válido | `unshare -rn bash -c 'npm run smoke'` |
 | El sistema se niega a hacer 54 de 64 transiciones | `core/estado.mjs` | T2-ilegal, una por cada una | `npm run metricas` |
