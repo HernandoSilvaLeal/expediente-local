@@ -21,7 +21,7 @@
 
 import { EVENTO } from './ledger.mjs'
 import { ESTADOS, exigirTransicion } from './estado.mjs'
-import { promover, nivelEvidencia } from './anclaje.mjs'
+import { promover, nivelEvidencia, normalizar } from './anclaje.mjs'
 import { EVIDENCIA } from './esquema.mjs'
 
 export class LedgerIncoherente extends Error {
@@ -65,6 +65,7 @@ export function proyectar (eventos) {
     rechazados: 0,
     duplicadoDe: null,
     contradicciones: [],
+    conflictos: [],
     decisiones: [],
     historial: []
   }
@@ -178,6 +179,38 @@ function aplicar (exp, e) {
  */
 function asentar (exp, c, e) {
   const previo = exp.campos.get(c.ruta)
+
+  // ── EL CAMPO NO PUEDE CAMBIAR DE VALOR EN SILENCIO ───────────────────────
+  //
+  // Este proyecto blindó el DATO —nada entra sin cita literal— y durante un
+  // tiempo dejó abierta LA PERSONA. Verificado: un expediente a nombre de
+  // Juan Pérez González se convertía en María Gómez Batista con CERO rechazos,
+  // cadena íntegra y ninguna alerta. Bastaba una segunda captura.
+  //
+  // En banca eso no es un detalle de implementación: es suplantación silenciosa.
+  //
+  // La política es la MISMA que ya aplica G9 entre expedientes distintos, ahora
+  // aplicada dentro de uno: si dos fuentes dicen cosas distintas del mismo
+  // campo, el sistema NO elige. Marca el conflicto y lo decide una persona.
+  //
+  // Que un campo RECHAZADO se resuelva después con un valor bueno sigue siendo
+  // legítimo —es el caso de uso CU-6— porque ahí no había valor asentado que
+  // contradecir: había un hueco.
+  if (previo && !mismoValor(previo.valor, c.valor)) {
+    exp.conflictos.push(Object.freeze({
+      seq: e.seq,
+      ruta: c.ruta,
+      asentado: previo.valor,
+      propuesto: c.valor,
+      citaAsentada: previo.cita,
+      citaPropuesta: c.cita ?? '',
+      motivo: 'dos fuentes dan valores distintos para el mismo campo'
+    }))
+    // El valor asentado SE CONSERVA. Cambiarlo exige una CONTRADICCION
+    // explícita, que es un hecho que una persona firma.
+    return
+  }
+
   const evidencia = previo ? promover(previo.evidencia, c.evidencia) : c.evidencia
 
   exp.campos.set(c.ruta, Object.freeze({
@@ -222,12 +255,15 @@ function congelar (exp, eventos) {
     historial: Object.freeze(exp.historial.map(Object.freeze)),
     decisiones: Object.freeze(exp.decisiones.map(Object.freeze)),
     contradicciones: Object.freeze(exp.contradicciones.map(Object.freeze)),
+    // Campos donde dos fuentes se contradicen. NO se resuelven solos.
+    conflictos: Object.freeze(exp.conflictos.map(Object.freeze)),
     resumen: Object.freeze({
       eventos: eventos.length,
       camposAsentados: Object.keys(campos).length,
       camposRechazados: exp.rechazados,
       huecosAbiertos: Object.keys(huecos).length,
       camposPropuestos: exp.propuestos,
+      conflictosAbiertos: exp.conflictos.length,
       ultimoHash: eventos[eventos.length - 1]?.hash ?? null,
       porEvidencia: contarPorEvidencia(campos)
     })
@@ -244,12 +280,25 @@ function vacio () {
   return Object.freeze({
     id: null, estado: null, campos: Object.freeze({}), huecos: Object.freeze({}), fuentes: Object.freeze([]),
     duplicadoDe: null, historial: Object.freeze([]), decisiones: Object.freeze([]),
-    contradicciones: Object.freeze([]),
+    contradicciones: Object.freeze([]), conflictos: Object.freeze([]),
     resumen: Object.freeze({
-      eventos: 0, camposAsentados: 0, camposRechazados: 0, huecosAbiertos: 0, camposPropuestos: 0,
+      eventos: 0, camposAsentados: 0, camposRechazados: 0, huecosAbiertos: 0,
+      conflictosAbiertos: 0, camposPropuestos: 0,
       ultimoHash: null, porEvidencia: contarPorEvidencia({})
     })
   })
+}
+
+/**
+ * ¿Son el mismo valor? Se compara normalizado, porque «Juan Pérez» y
+ * «JUAN PEREZ» son la misma persona y no un conflicto — pero «Juan Pérez» y
+ * «Juan Peres» SÍ lo son: una letra de diferencia es otra persona, igual que
+ * en el anclaje.
+ */
+function mismoValor (a, b) {
+  if (a === b) return true
+  if (typeof a === 'number' || typeof b === 'number') return Number(a) === Number(b)
+  return normalizar(String(a ?? '')) === normalizar(String(b ?? ''))
 }
 
 /**

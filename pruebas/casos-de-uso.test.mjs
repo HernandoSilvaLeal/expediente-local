@@ -25,6 +25,8 @@ import { join } from 'node:path'
 import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente, aCsv } from '../core/expediente.mjs'
 import { ORIGENES } from '../core/estado.mjs'
+import { leer } from '../core/ledger.mjs'
+import { calidad } from '../core/calidad.mjs'
 import { RECHAZO } from '../core/guardias.mjs'
 import { revisarDominio } from '../instancias/banca/guardias.mjs'
 
@@ -583,5 +585,212 @@ test('CU-18 · MEDIDO · el core genérico atrapa los tres errores del 9-sep en 
     // El único cambio respecto al caso bancario es el .json del esquema.
     assert.equal(SALUD.dominio, 'salud')
     assert.equal(SALUD.guardiasDominio, null, 'y sin reglas de dominio, que también es legítimo')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ═════════════════════════════════════════════════════════════════════
+//  CASO 19 · 🚨 UN EXPEDIENTE NO PUEDE CAMBIAR DE TITULAR EN SILENCIO
+// ═════════════════════════════════════════════════════════════════════
+
+test('CU-19 · dos fuentes que discrepan NO se resuelven solas: se marca el conflicto', () => {
+  // ── EL FALLO QUE ESTE TEST EXISTE PARA QUE NO VUELVA ─────────────────────
+  //
+  // El proyecto blindó el DATO —nada entra sin cita literal— y durante un tiempo
+  // dejó abierta LA PERSONA. Verificado el 10-sep: un expediente a nombre de
+  // Juan Pérez González se convertía en María Gómez Batista con CERO rechazos,
+  // cadena íntegra y ninguna alerta. Bastaba una segunda captura.
+  //
+  // En banca eso no es un detalle de implementación: es suplantación silenciosa.
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-suplanta-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-SUP',
+      ahora: () => `2026-09-10T19:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+
+    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456.')
+    exp.asentar({
+      titular: {
+        nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
+        cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' }
+      },
+      documentos: []
+    })
+    assert.equal(exp.leer().campos['titular.nombre'].valor, 'Juan Pérez González')
+
+    // Llega una segunda fuente que dice OTRA persona, con su cita perfectamente
+    // anclada. El anclaje no puede detectar esto: la cita es real.
+    exp.capturar('El titular es María Gómez Batista, cédula 8-123-456.')
+    exp.asentar({
+      titular: {
+        nombre: { valor: 'María Gómez Batista', cita: 'El titular es María Gómez Batista' },
+        cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' }
+      },
+      documentos: []
+    })
+
+    const e = exp.leer()
+    assert.equal(e.campos['titular.nombre'].valor, 'Juan Pérez González',
+      'el valor asentado SE CONSERVA: cambiarlo exige una contradicción que alguien firme')
+    assert.equal(e.resumen.conflictosAbiertos, 1)
+
+    const c = e.conflictos.find(x => x.ruta === 'titular.nombre')
+    assert.ok(c, 'el conflicto tiene que quedar registrado, no descartado')
+    assert.equal(c.asentado, 'Juan Pérez González')
+    assert.equal(c.propuesto, 'María Gómez Batista')
+    assert.ok(c.citaAsentada && c.citaPropuesta,
+      'con las DOS citas: sin ellas una persona no puede arbitrar')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('CU-20 · pero la misma persona escrita distinto NO es un conflicto', () => {
+  // «JUAN PEREZ GONZALEZ» y «Juan Pérez González» son el mismo titular. Marcar
+  // eso como conflicto convertiría la guardia en un obstáculo, y un obstáculo
+  // se desactiva.
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-mismo-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-M',
+      ahora: () => `2026-09-10T20:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456.')
+    exp.asentar({ titular: { nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' } }, documentos: [] })
+
+    exp.capturar('EL TITULAR ES JUAN PEREZ GONZALEZ, CEDULA 8-123-456.')
+    exp.asentar({ titular: { nombre: { valor: 'JUAN PEREZ GONZALEZ', cita: 'EL TITULAR ES JUAN PEREZ GONZALEZ' } }, documentos: [] })
+
+    assert.equal(exp.leer().resumen.conflictosAbiertos, 0,
+      'tildes y mayúsculas no hacen a dos personas distintas')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('CU-21 · y un HUECO que se resuelve después sigue siendo legítimo', () => {
+  // La distinción fina: si no había valor asentado, no hay nada que contradecir.
+  // Es CU-6, y tiene que seguir funcionando después del arreglo.
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-hueco-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-H',
+      ahora: () => `2026-09-10T21:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+    exp.capturar('El titular es Juan Pérez González. La cédula no se lee.')
+    exp.asentar({ titular: { nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' }, cedula: { valor: '8-000-000', cita: 'cédula 8-000-000' } }, documentos: [] })
+    assert.ok(exp.leer().huecos['titular.cedula'])
+
+    exp.capturar('Se adjunta la cédula: 8-123-456.')
+    exp.asentar({ titular: { nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' }, cedula: { valor: '8-123-456', cita: 'la cédula: 8-123-456' } }, documentos: [] })
+
+    const e = exp.leer()
+    assert.equal(e.campos['titular.cedula'].valor, '8-123-456', 'el hueco se resolvió')
+    assert.equal(e.resumen.conflictosAbiertos, 0, 'resolver un hueco no es contradecir')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CU-22 · Un ledger es de un solo expediente, y nadie lo contamina
+//
+//  Cómo apareció: `node cli.mjs aprobar --ledger datos/EXP-003.jsonl` sin pasar
+//  --expediente cogía el valor por defecto del CLI (EXP-001) y escribía un
+//  evento DECISION_HUMANA de EXP-001 DENTRO del ledger de EXP-003.
+//
+//  Lo peor no era el error: era CUÁNDO llegaba. La proyección lo detectaba al
+//  leer —el invariante funcionaba—, pero el evento ya estaba en disco, y un
+//  ledger append-only no tiene borrado. El expediente quedaba ilegible para
+//  siempre por haber escrito un comando al que le faltaba una bandera.
+//
+//  Ahora se comprueba ANTES de escribir el primer byte.
+// ═══════════════════════════════════════════════════════════════════════════
+test('CU-22 · abrir un ledger ajeno falla ANTES de escribir, no al leer', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-duenio-'))
+  const ruta = join(dir, 'e.jsonl')
+  try {
+    let n = 0
+    const reloj = () => `2026-09-10T22:${String(n++).padStart(2, '0')}:00.000Z`
+
+    const propio = abrirExpediente({ ruta, esquema: ESQ, id: 'EXP-003', ahora: reloj })
+    propio.capturar('El titular es Juan Pérez González.')
+    const hechosAntes = leer(ruta).length
+
+    // Otro expediente intenta escribir en el mismo archivo.
+    assert.throws(
+      () => abrirExpediente({ ruta, esquema: ESQ, id: 'EXP-001', ahora: reloj }),
+      /pertenece a EXP-003/,
+      'el núcleo rechaza abrir un ledger que no es suyo')
+
+    assert.equal(leer(ruta).length, hechosAntes,
+      'y sobre todo: NO escribió nada antes de darse cuenta')
+
+    // El legítimo sigue pudiendo trabajar: la guardia no bloquea al dueño.
+    propio.capturar('Se adjunta la cédula.')
+    assert.equal(leer(ruta).length, hechosAntes + 1)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CU-23 · ⭐ NO SE FIRMA SOBRE UN CAMPO EN DISPUTA
+//
+//  El caso de banca que este proyecto existe para no dejar pasar: el formulario
+//  de apertura dice que el titular es Juan Pérez González; la carta laboral del
+//  mismo expediente dice María Gómez Batista, con la misma cédula.
+//
+//  Las dos citas son literales. Ninguna guardia de anclaje puede ayudar aquí,
+//  porque ninguna de las dos fuentes está inventando: se contradicen entre ellas.
+//
+//  Medido antes del arreglo: el expediente llegaba a COMPLETO con completitud
+//  100 % y se aprobaba sin una sola advertencia. El conflicto estaba levantado
+//  y visible en pantalla, y la firma pasaba por encima. Una cuenta abierta a
+//  nombre de nadie.
+// ═══════════════════════════════════════════════════════════════════════════
+test('CU-23 · ⭐ un expediente con el titular en disputa NO se puede aprobar', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-disputa-'))
+  const ruta = join(dir, 'e.jsonl')
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta, esquema: ESQ, id: 'EXP-D',
+      ahora: () => `2026-09-10T23:${String(n++).padStart(2, '0')}:00.000Z`
+    })
+
+    const doc = { tipo: 'RECIBO_SERVICIO',
+      emisor:        { valor: 'IDAAN', cita: 'el recibo del IDAAN' },
+      fecha_emision: { valor: '20 de agosto de 2026', cita: 'del 20 de agosto de 2026' },
+      monto:         { valor: 45.30, cita: 'por 45.30 balboas' } }
+
+    // Fuente 1 — el formulario de apertura. Expediente completo y aprobable.
+    exp.capturar('El titular es Juan Pérez González, cédula 8-123-456. Presenta el recibo del IDAAN del 20 de agosto de 2026 por 45.30 balboas.')
+    exp.asentar({ titular: {
+      nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
+      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [doc] })
+
+    assert.ok(calidad(exp.leer(), ESQ).puedeCerrar, 'con una sola fuente, cierra')
+
+    // Fuente 2 — la carta laboral. Otro titular, la misma cédula.
+    exp.capturar('Según la carta laboral el titular es María Gómez Batista, cédula 8-123-456.')
+    exp.asentar({ titular: {
+      nombre: { valor: 'María Gómez Batista', cita: 'el titular es María Gómez Batista' },
+      cedula: { valor: '8-123-456', cita: 'cédula 8-123-456' } }, documentos: [] })
+
+    const e = exp.leer()
+    assert.equal(e.conflictos.length, 1, 'el conflicto está levantado')
+    assert.equal(e.campos['titular.nombre'].valor, 'Juan Pérez González',
+      'y el valor asentado NO se sobrescribió')
+    assert.equal(calidad(e, ESQ).puedeCerrar, false,
+      'un conflicto abierto impide cerrar, aunque no falte ningún campo')
+
+    // LA FIRMA SE PARA.
+    const hechosAntes = leer(ruta).length
+    assert.throws(() => exp.decidir('aprobar', { motivo: 'visto bueno' }),
+      /se contradicen \(titular\.nombre\)/,
+      'no se aprueba un expediente cuyo titular está en disputa')
+    assert.equal(leer(ruta).length, hechosAntes,
+      'y no queda una DECISION_HUMANA fantasma en el ledger append-only')
+
+    // Rechazar SÍ se permite: cerrar un expediente contradictorio es
+    // exactamente lo que un oficial debe poder hacer.
+    const tras = exp.decidir('rechazar', { motivo: 'titular en disputa entre dos documentos' })
+    assert.equal(tras.estado, 'RECHAZADO')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

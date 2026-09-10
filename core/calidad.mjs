@@ -53,6 +53,7 @@ export function calidad (expediente, esquema) {
   const criticos = esquema?.camposCriticos ?? []
   const campos = expediente?.campos ?? {}
   const huecos = expediente?.huecos ?? {}
+  const conflictos = expediente?.conflictos ?? []
 
   const criticosPresentes = criticos.filter(c => tieneCampo(campos, c))
   const completitud = criticos.length ? criticosPresentes.length / criticos.length : 1
@@ -69,10 +70,23 @@ export function calidad (expediente, esquema) {
     criticosAusentes: Object.freeze(criticos.filter(c => !tieneCampo(campos, c))),
     camposAnclados: anclados.length,
     huecosAbiertos: Object.keys(huecos).length,
+    conflictosAbiertos: conflictos.length,
     porEvidencia: contarPorEvidencia(anclados),
-    // Puede cerrar SOLO si están todos los críticos. No es una puntuación:
-    // es un sí o un no, y por eso va aparte de los dos números de arriba.
-    puedeCerrar: completitud === 1
+    // ── PUEDE CERRAR SOLO SI ESTÁN TODOS LOS CRÍTICOS **Y NINGUNO EN DISPUTA** ──
+    //
+    // No es una puntuación: es un sí o un no, y por eso va aparte de los dos
+    // números de arriba.
+    //
+    // Lo segundo se añadió después de verlo pasar: un expediente con el titular
+    // en conflicto —el formulario dice Juan Pérez, la carta laboral dice María
+    // Gómez, la cédula es la misma— llegaba a COMPLETO con completitud 100 % y
+    // se dejaba aprobar. La completitud contaba el campo como presente, que es
+    // cierto: hay un valor asentado. Pero «hay un valor» y «sabemos de quién es
+    // la cuenta» no son la misma frase.
+    //
+    // Un conflicto abierto no es un dato de menos: es una pregunta sin responder
+    // sobre un dato que ya está dentro. Y esa se responde antes de firmar.
+    puedeCerrar: completitud === 1 && conflictos.length === 0
   })
 }
 
@@ -98,6 +112,7 @@ export function preguntasPendientes (expediente, esquema) {
   const criticos = esquema?.camposCriticos ?? []
   const campos = expediente?.campos ?? {}
   const huecos = expediente?.huecos ?? {}
+  const conflictos = expediente?.conflictos ?? []
   const pendientes = []
 
   for (const ruta of criticos) {

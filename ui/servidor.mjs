@@ -44,7 +44,10 @@ const arg = (n, d) => { const i = argv.indexOf('--' + n); return i === -1 ? d : 
 const PUERTO = Number(arg('puerto', process.env.PORT ?? '7301'))
 const DATOS = join(RAIZ, arg('datos', 'datos'))
 const esquema = cargarEsquema(arg('esquema', 'instancias/banca/esquema.json'))
-const dominio = await cargarDominio(esquema, { hoy: new Date() })
+// El reloj se puede fijar aquí igual que en el CLI: si no, los expedientes
+// de ejemplo caducan solos y la interfaz enseña rechazos que no son reales.
+const hoy = arg('hoy', null) ? new Date(`${arg('hoy')}T12:00:00Z`) : new Date()
+const dominio = await cargarDominio(esquema, { hoy })
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
                 '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' }

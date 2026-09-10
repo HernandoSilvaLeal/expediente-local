@@ -142,7 +142,35 @@ async function cargarLista () {
   $('#dominio').textContent = d.esquema.dominio + ' / ' + d.esquema.entidad
 
   if (!d.expedientes.length) {
+    // ── LA PANTALLA VACÍA ERA LA PRIMERA IMPRESIÓN DEL PROYECTO ────────────
+    // Un repositorio recién clonado no tiene `datos/`, así que `npm start`
+    // abría esto. Quien evalúa once proyectos no depura una pantalla en
+    // blanco: cierra la pestaña. Ahora dice exactamente qué escribir.
     $('#lista').innerHTML = '<p class="aviso">todavía no hay expedientes</p>'
+    $('#detalle').innerHTML = `
+      <div class="tarjeta">
+        <h2>Empieza aquí</h2>
+        <p class="aviso" style="padding-top:0">
+          Este repositorio se clona sin datos. Un comando siembra los tres
+          expedientes que cuentan la historia completa, y esta página se llena:
+        </p>
+        <pre style="max-height:none"><code>npm run demo</code></pre>
+        <table>
+          <tr><td class="ruta mono">EXP-001</td>
+              <td>la fuente dice la verdad · llega a <span class="estado e-APROBADO">APROBADO</span>
+              <div class="motivo">y lo aprueba una persona, no el software</div></td></tr>
+          <tr><td class="ruta mono">EXP-002</td>
+              <td>el modelo inventa tres campos
+              <div class="motivo">G3 los para: quedan como huecos explicados, no como datos</div></td></tr>
+          <tr><td class="ruta mono">EXP-003</td>
+              <td>dos documentos, dos titulares distintos
+              <div class="motivo">nadie miente y nadie gana: el conflicto lo decide una persona</div></td></tr>
+        </table>
+        <p class="aviso">
+          Todo sintético y ficticio. Ninguna persona real, ningún cliente real.
+          Después de sembrar, recarga esta página.
+        </p>
+      </div>`
     return
   }
   $('#lista').innerHTML = d.expedientes.map(e => `
@@ -197,6 +225,23 @@ async function abrirExpediente (id) {
             <td class="ruta mono">${esc(ruta)}</td>
             <td>${h.guardias.map(g => `<span class="guardia">${esc(g)}</span>`).join('')}
                 <span class="motivo">${esc(h.motivos.join(', '))}</span></td>
+          </tr>`).join('')}
+      </table>
+    </div>` : ''}
+
+    ${(e.conflictos || []).length ? `<div class="tarjeta hueco">
+      <h2>⚔ Dos fuentes se contradicen</h2>
+      <p class="aviso" style="padding-top:0">el sistema no elige ni promedia: lo decide una persona</p>
+      <table>
+        ${e.conflictos.map(c => `
+          <tr>
+            <td class="ruta mono">${esc(c.ruta)}</td>
+            <td>
+              <div><b>${esc(c.asentado)}</b> <span class="motivo">— asentado</span>
+                <div class="cita">«${esc(c.citaAsentada)}»</div></div>
+              <div style="margin-top:6px"><b>${esc(c.propuesto)}</b> <span class="motivo">— propuesto</span>
+                <div class="cita">«${esc(c.citaPropuesta)}»</div></div>
+            </td>
           </tr>`).join('')}
       </table>
     </div>` : ''}

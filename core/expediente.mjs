@@ -59,6 +59,23 @@ export function abrirExpediente ({
     throw new TypeError('guardiasDominio debe ser una función (campo, contexto) => rechazos')
   }
 
+  // ── UN LEDGER ES DE UN SOLO EXPEDIENTE, Y EL LEDGER MANDA ────────────────
+  //
+  // Verificado: `node cli.mjs aprobar --ledger datos/EXP-003.jsonl` sin pasar
+  // --expediente tomaba el valor por defecto del CLI y escribía un evento
+  // DECISION_HUMANA **de EXP-001 dentro del ledger de EXP-003**.
+  //
+  // La proyección lo detectaba DESPUÉS —el invariante hacía su trabajo—, pero
+  // para entonces el evento ya estaba en disco. Un ledger append-only no tiene
+  // borrado: el archivo queda envenenado y el expediente, ilegible para siempre.
+  // Por eso esto se comprueba ANTES de escribir el primer byte, no al leer.
+  const duenio = leer(ruta).find(e => e.expediente)?.expediente
+  if (duenio && duenio !== id) {
+    throw new Error(
+      `El ledger «${ruta}» pertenece a ${duenio}, no a ${id}. ` +
+      'Un ledger guarda un solo expediente, y lo escrito no se puede desescribir.')
+  }
+
   const hecho = (tipo, campos = {}) =>
     registrar(ruta, { tipo, expediente: id, ts: ahora(), ...campos })
 
@@ -214,14 +231,42 @@ export function abrirExpediente ({
         throw new Error('Rechazar exige motivo. Un rechazo sin causa no es auditable.')
       }
 
-      hecho(EVENTO.DECISION_HUMANA, { origen: ORIGENES.HUMANO, motivo, datos: { que } })
-
+      // ── SE COMPRUEBA TODO **ANTES** DE ESCRIBIR EL EVENTO ──────────────────
+      //
+      // La DECISION_HUMANA se registraba primero y se validaba después. Cuando
+      // la validación fallaba, el error era correcto pero el evento ya estaba en
+      // disco: el ledger acababa guardando decisiones humanas que el sistema
+      // había rechazado, indistinguibles de las que sí surtieron efecto.
+      // En un archivo append-only eso no se arregla luego.
       const desde = estadoActual()
       if (!esLegal(desde, hacia)) {
         throw new Error(
           `No se puede ${que} un expediente en estado ${desde}. ` +
           'Hay que completar la extracción y la validación primero.')
       }
+
+      // ── NO SE FIRMA SOBRE UN CAMPO EN DISPUTA ──────────────────────────────
+      //
+      // Verificado: un expediente donde el formulario decía Juan Pérez González
+      // y la carta laboral decía María Gómez Batista —misma cédula— llegaba a
+      // COMPLETO y se aprobaba sin una sola advertencia. El conflicto estaba
+      // levantado y visible, y aun así la firma pasaba por encima.
+      //
+      // El estado no bastaba para pararlo: cuando la segunda fuente llegó, el
+      // expediente YA estaba en COMPLETO, y un conflicto no lo hacía retroceder.
+      // Así que la comprobación va aquí, donde ocurre el acto que importa.
+      //
+      // Rechazar sí se permite: cerrar un expediente contradictorio es
+      // exactamente lo que un oficial debe poder hacer.
+      const enDisputa = this.leer().conflictos ?? []
+      if (hacia === ESTADOS.APROBADO && enDisputa.length) {
+        throw new Error(
+          `No se puede aprobar: ${enDisputa.length === 1 ? 'hay un campo' : `hay ${enDisputa.length} campos`} ` +
+          `con dos fuentes que se contradicen (${enDisputa.map(c => c.ruta).join(', ')}). ` +
+          'Resuélvase el conflicto antes de firmar.')
+      }
+
+      hecho(EVENTO.DECISION_HUMANA, { origen: ORIGENES.HUMANO, motivo, datos: { que } })
       hecho(EVENTO.TRANSICION, { origen: ORIGENES.HUMANO, motivo, datos: { desde, hacia } })
       return this.leer()
     },

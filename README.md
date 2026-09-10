@@ -74,14 +74,21 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **307 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **312 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **12 puertas**, cada una eliminatoria |
 | Que **cada guardia** hace su trabajo | `npm run casos` | **13 casos trampa**, cobertura G1..G8 |
 | Que los datos del disco están sanos | `npm run verify:invariantes` | **5/5** invariantes, y `--demo` enseña el rojo |
 | El estado real del proyecto | `npm run metricas` | el tablero, medido al ejecutarlo |
+| **Los datos de ejemplo** | `npm run demo` | tres expedientes sembrados en 2 s: uno limpio, uno con invenciones, uno en conflicto |
 | **La interfaz** | `npm start` → http://127.0.0.1:7301 | cero dependencias, cero build |
+
+> **Si acabas de clonar, empieza por `npm run demo`.** El repositorio no trae
+> datos —`datos/` está en el `.gitignore`, y un expediente bancario no se
+> versiona— así que `npm start` a secas abre una página que solo sabe decirte
+> que corras eso. Los tres expedientes que siembra son la explicación entera
+> del proyecto, y son sintéticos y ficticios: ninguna persona real.
 
 **El flujo completo, sin modelo:**
 
@@ -105,7 +112,36 @@ comete de verdad**. La salida enseña qué entró, qué no, y **qué guardia par
      ○ documentos[0].emisor       G3 · SIN_ANCLAJE
 ```
 
-Y el expediente **no se puede aprobar**, porque le falta un campo crítico:
+### ⚔ Y cuando dos documentos del mismo expediente no dicen lo mismo
+
+El formulario de apertura dice que el titular es Juan Pérez González. La carta
+laboral del mismo expediente dice María Gómez Batista, con **la misma cédula**.
+
+Las dos citas son literales, así que el anclaje no puede ayudar: ninguna de las
+dos fuentes está inventando nada — **se contradicen entre ellas**. Un sistema
+donde la última escritura gana convierte un expediente en otro sin que nadie se
+entere, y eso en banca tiene nombre.
+
+```
+  ⚔ DOS FUENTES SE CONTRADICEN   el sistema NO elige: decide una persona
+     ⚔ titular.nombre
+        asentado:  «Juan Pérez González»   ←  El titular es Juan Pérez González
+        propuesto: «María Gómez Batista»   ←  el titular es María Gómez Batista
+```
+
+El valor asentado **se conserva**, el conflicto queda levantado con las dos citas
+enfrentadas, y la firma se para en seco:
+
+```bash
+node cli.mjs aprobar --ledger datos/EXP-003.jsonl --texto "visto bueno"
+#  ✗ No se puede aprobar: hay un campo con dos fuentes que se contradicen
+#    (titular.nombre). Resuélvase el conflicto antes de firmar.
+```
+
+Rechazarlo sí se permite: cerrar un expediente contradictorio es exactamente lo
+que un oficial debe poder hacer. Fijado por **CU-19** y **CU-23**.
+
+Y el expediente **no se puede aprobar** tampoco cuando le falta un campo crítico:
 
 ```bash
 node cli.mjs aprobar --ledger /tmp/demo/e.jsonl --texto "confío"
@@ -157,7 +193,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 267 tests, sin modelo y sin red
+npm test                  # 312 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -172,7 +208,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **267/267** | 1 s |
+| `npm test` → **312/312** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **11/11 puertas
@@ -236,7 +272,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **307 / 307** verdes, sin modelo y sin red |
+| Tests | **312 / 312** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **~62 %** |
 | Casos de uso punta a punta | **18** |
 | Casos trampa, uno por guardia | **13 / 13** — cobertura G1..G8 |

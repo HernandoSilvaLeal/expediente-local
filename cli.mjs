@@ -30,6 +30,7 @@ import { parseArgs } from 'node:util'
 
 import { cargarEsquema } from './core/esquema.mjs'
 import { abrirExpediente, aCsv } from './core/expediente.mjs'
+import { leer as leerLedger } from './core/ledger.mjs'
 import { cargarDominio } from './scripts/cargar-dominio.mjs'
 
 const { values: op, positionals } = parseArgs({
@@ -44,10 +45,20 @@ const { values: op, positionals } = parseArgs({
     modelo:     { type: 'string' },
     proveedor:  { type: 'string' },   // clave pública del par que tiene la GPU
     salida:     { type: 'string' },
+    hoy:        { type: 'string' },   // fija el reloj: ver abajo
     json:       { type: 'boolean', default: false },
     ayuda:      { type: 'boolean', default: false, short: 'h' }
   }
 })
+
+// Los colores se declaran AQUÍ, antes del primer uso, y no más abajo.
+//
+// Estaban después de `abrirExpediente`, así que `node cli.mjs` a secas —lo
+// primero que escribe cualquiera que llega al repo— reventaba con
+// «ReferenceError: Cannot access 'B' before initialization»: la zona muerta
+// temporal de `const`. La primera impresión del proyecto era un stack trace.
+const V = '\x1b[0;32m', R = '\x1b[0;31m', A = '\x1b[0;33m'
+const C = '\x1b[0;36m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
 
 const comando = positionals[0]
 if (!comando || op.ayuda) { ayuda(); process.exit(comando ? 0 : 1) }
@@ -55,9 +66,53 @@ if (!comando || op.ayuda) { ayuda(); process.exit(comando ? 0 : 1) }
 const esquema = cargarEsquema(op.esquema)
 const ruta = op.ledger ?? `datos/${op.expediente}.jsonl`
 
+// ── SI EL LEDGER YA EXISTE, ÉL DICE DE QUIÉN ES ──────────────────────────
+//
+// `--expediente` tiene un valor por defecto para que los ejemplos del README
+// funcionen sin escribirlo. Ese valor por defecto, combinado con un --ledger
+// explícito de OTRO expediente, era una trampa silenciosa:
+//
+//   node cli.mjs aprobar --ledger datos/EXP-003.jsonl
+//                        ↑ el ledger es de EXP-003, el id por defecto es EXP-001
+//
+// El núcleo ahora lo rechaza (ver core/expediente.mjs), pero rechazar con un
+// error no es lo que quiere quien escribió ese comando: quiere aprobar EXP-003.
+// Así que aquí el id se DEDUCE del ledger, y el error del núcleo queda como
+// red de seguridad para cuando se pasen los dos y no coincidan.
+const idDelLedger = leerLedger(ruta).find(e => e.expediente)?.expediente
+if (idDelLedger && op.expediente !== idDelLedger) {
+  // Se pasó --expediente Y no coincide: eso es un dedo equivocado, no un atajo.
+  if (process.argv.includes('--expediente')) {
+    console.error(`\n  ${R}✗ El ledger «${ruta}» es de ${idDelLedger}, ` +
+                  `y --expediente dice ${op.expediente}${N}\n`)
+    process.exit(1)
+  }
+  op.expediente = idDelLedger
+}
+
+// ── EL RELOJ SE PUEDE FIJAR, Y HACE FALTA ────────────────────────────────
+//
+// Las guardias de vigencia comparan contra HOY. Con el reloj del sistema, un
+// expediente de ejemplo que hoy se aprueba deja de aprobarse dentro de tres
+// meses, sin que nadie haya tocado nada: los datos de demostración CADUCAN SOLOS.
+//
+// Ya pasó: el dictado de ejemplo llevaba una fecha de marzo y en septiembre el
+// mismo comando que antes terminaba en APROBADO empezó a rechazarse por
+// documento vencido. Quien clone este repositorio dentro de seis meses vería
+// una demostración rota y pensaría que el proyecto no funciona.
+//
+//   --hoy 2026-09-01    fija el día para que la demostración sea reproducible
+//
+// Sin la bandera se usa el reloj real, que es lo correcto en uso normal.
+const hoy = op.hoy ? new Date(`${op.hoy}T12:00:00Z`) : new Date()
+if (op.hoy && Number.isNaN(hoy.getTime())) {
+  console.error(`\n  ✗ --hoy debe tener la forma AAAA-MM-DD, y llegó "${op.hoy}"\n`)
+  process.exit(1)
+}
+
 // Las reglas de negocio las declara el ESQUEMA y las carga quien arranca.
 // `core/` nunca las importa: ver scripts/cargar-dominio.mjs.
-const dominio = await cargarDominio(esquema, { hoy: new Date() })
+const dominio = await cargarDominio(esquema, { hoy })
 
 const exp = abrirExpediente({
   ruta, esquema, id: op.expediente,
@@ -66,8 +121,6 @@ const exp = abrirExpediente({
   contextoDominio: dominio.contexto
 })
 
-const V = '\x1b[0;32m', R = '\x1b[0;31m', A = '\x1b[0;33m'
-const C = '\x1b[0;36m', G = '\x1b[0;90m', B = '\x1b[1m', N = '\x1b[0m'
 
 try {
   await ejecutar(comando)
@@ -212,6 +265,16 @@ function pintar (e, revision) {
     }
   }
 
+  const conflictos = e.conflictos ?? []
+  if (conflictos.length) {
+    console.log(`\n  ${B}${A}⚔ DOS FUENTES SE CONTRADICEN${N}   ${G}el sistema NO elige: decide una persona${N}`)
+    for (const c of conflictos) {
+      console.log(`     ${A}⚔${N} ${c.ruta}`)
+      console.log(`        ${G}asentado:  «${c.asentado}»  ←  ${c.citaAsentada}${N}`)
+      console.log(`        ${G}propuesto: «${c.propuesto}»  ←  ${c.citaPropuesta}${N}`)
+    }
+  }
+
   if (revision) {
     const r = revision.resumen
     console.log(`\n  ${G}${r.aceptados} campos anclados · ${r.rechazados} rechazados` +
@@ -252,6 +315,7 @@ function ayuda () {
 
   ${B}COMUNES${N}  --expediente EXP-001 · --ledger datos/x.jsonl
             --esquema instancias/banca/esquema.json · --json
+            ${C}--hoy AAAA-MM-DD${N}  ${G}fija el día, para que una demo no caduque sola${N}
 
   ${G}Todos los comandos menos 'capturar' funcionan SIN el SDK instalado.${N}
   ${G}No es una optimización: es la frontera 95/5 comportándose.${N}

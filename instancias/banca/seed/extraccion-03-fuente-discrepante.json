@@ -1,0 +1,29 @@
+{
+  "titular": {
+    "nombre": {
+      "valor": "María Gómez Batista",
+      "cita": "el titular es María Gómez Batista"
+    },
+    "cedula": {
+      "valor": "8-123-456",
+      "cita": "cédula 8-123-456"
+    }
+  },
+  "documentos": [
+    {
+      "tipo": "RECIBO_SERVICIO",
+      "emisor": {
+        "valor": "IDAAN",
+        "cita": "El recibo del IDAAN"
+      },
+      "fecha_emision": {
+        "valor": "20 de agosto de 2026",
+        "cita": "del 20 de agosto de 2026"
+      },
+      "monto": {
+        "valor": 45.3,
+        "cita": "por 45.30 balboas"
+      }
+    }
+  ]
+}
