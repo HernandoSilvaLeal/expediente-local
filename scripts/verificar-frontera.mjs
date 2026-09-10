@@ -20,16 +20,46 @@ import { fileURLToPath } from 'node:url'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Directorios que deben permanecer libres del SDK, y por qué. */
+/**
+ * Cada zona declara QUÉ prohíbe, y no todas prohíben lo mismo.
+ *
+ * `pruebas/` no puede tocar el SDK —los tests corren sin modelo— pero SÍ tiene
+ * que poder importar `instancias/banca/guardias.mjs`: es donde se prueban. Meter
+ * las dos zonas en el mismo saco convertía el verificador en un obstáculo, que
+ * es la forma más rápida de que alguien lo desactive «solo un momento».
+ */
 const ZONAS_LIMPIAS = [
-  { dir: 'core',    razon: 'el núcleo determinista decide qué entra al dataset' },
-  { dir: 'pruebas', razon: 'los tests deben correr sin modelo cargado' }
+  { dir: 'core',
+    prohibe: ['sdk', 'dominio'],
+    razon: 'el núcleo decide qué entra al dataset, y no sabe de qué dominio' },
+  { dir: 'pruebas',
+    prohibe: ['sdk'],
+    razon: 'los tests corren sin modelo cargado (pero sí prueban los dominios)' }
 ]
+
+const PATRONES = Object.freeze({
+  sdk:     { re: /^@qvac\//,   que: 'el SDK' },
+  dominio: { re: /instancias\//, que: 'un dominio concreto' }
+})
 
 /** El único directorio autorizado a tocar el SDK. */
 const ZONA_IA = 'ia'
 
-const PROHIBIDO = /^@qvac\//
+/**
+ * Dos fronteras, no una.
+ *
+ *   @qvac/*       → la frontera 95/5: el núcleo no consulta a un modelo
+ *   instancias/*  → la frontera de GENERICIDAD: el núcleo no sabe de banca
+ *
+ * La segunda se añadió al conectar las guardias de dominio. Si `core/` importara
+ * `instancias/banca/guardias.mjs`, la afirmación «el mismo código sirve para
+ * inventario hospitalario» dejaría de ser cierta en ese mismo instante — y
+ * seguiría estando escrita en el README, que es lo peligroso.
+ *
+ * Las guardias de dominio se INYECTAN al abrir el expediente. El núcleo solo
+ * sabe que existe una función y que devuelve rechazos.
+ */
+const PROHIBIDO = /^@qvac\/|instancias\//
 
 // ── Extracción de imports, ignorando comentarios y cadenas ────────────────────
 
@@ -114,17 +144,22 @@ function archivosJs (dir, acc = []) {
 let fugas = 0
 let revisados = 0
 
-console.log('\n  FRONTERA 95/5 — el núcleo no puede tocar el modelo\n')
+console.log('\n  LAS DOS FRONTERAS\n')
+console.log('     95/5          el núcleo no puede tocar el modelo')
+console.log('     genericidad   el núcleo no puede saber de qué dominio\n')
 
-for (const { dir, razon } of ZONAS_LIMPIAS) {
+for (const { dir, razon, prohibe } of ZONAS_LIMPIAS) {
   const archivos = archivosJs(join(RAIZ, dir))
   revisados += archivos.length
   const malos = []
 
   for (const abs of archivos) {
     for (const { spec, linea } of importsDe(abs)) {
-      if (PROHIBIDO.test(spec)) {
-        malos.push(`${relative(RAIZ, abs)}:${linea}  importa  ${spec}`)
+      for (const clave of prohibe) {
+        const { re, que } = PATRONES[clave]
+        if (re.test(spec)) {
+          malos.push(`${relative(RAIZ, abs)}:${linea}  importa ${que}:  ${spec}`)
+        }
       }
     }
   }
@@ -134,20 +169,22 @@ for (const { dir, razon } of ZONAS_LIMPIAS) {
     console.log(`  🔴 ${dir}/ — ${razon}`)
     malos.forEach(m => console.log(`       ${m}`))
   } else {
-    console.log(`  ✅ ${dir}/  ${String(archivos.length).padStart(2)} módulos, cero importan @qvac/*`)
+    const lista = prohibe.map(k => PATRONES[k].que).join(' ni ')
+    console.log(`  ✅ ${dir}/  ${String(archivos.length).padStart(2)} módulos, ninguno importa ${lista}`)
   }
 }
 
 // Contrapartida: el SDK tiene que estar en algún sitio, y ese sitio es ia/.
 const enIA = archivosJs(join(RAIZ, ZONA_IA))
-const conSdk = enIA.filter(a => importsDe(a).some(({ spec }) => PROHIBIDO.test(spec)))
+const conSdk = enIA.filter(a => importsDe(a).some(({ spec }) => PATRONES.sdk.re.test(spec)))
 console.log(`  ℹ️  ${ZONA_IA}/   ${String(enIA.length).padStart(2)} módulos, ${conSdk.length} tocan el SDK  (es su función)`)
 
 console.log('')
 if (fugas) {
-  console.log(`  🔴 FRONTERA ROTA — ${fugas} import(s) del SDK fuera de ${ZONA_IA}/`)
-  console.log('     El núcleo debe correr sin modelo, sin red y sin el SDK.\n')
+  console.log(`  🔴 FRONTERA ROTA — ${fugas} import(s) prohibido(s)`)
+  console.log('     El núcleo debe correr sin modelo, sin red y sin saber de qué dominio.\n')
   process.exit(1)
 }
-console.log(`  ✅ FRONTERA INTACTA — ${revisados} módulos verificados, cero fugas.`)
-console.log('     El núcleo corre sin modelo, sin red y sin el SDK.\n')
+console.log(`  ✅ LAS DOS FRONTERAS INTACTAS — ${revisados} módulos verificados, cero fugas.`)
+console.log('     El núcleo corre sin modelo, sin red y sin el SDK.')
+console.log('     Y no sabe qué es un banco: las reglas de dominio se le INYECTAN.\n')

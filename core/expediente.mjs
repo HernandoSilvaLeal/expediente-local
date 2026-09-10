@@ -20,6 +20,7 @@
 // PROHIBIDO aquí: importar @qvac/sdk. Verificado por scripts/verificar-frontera.mjs
 
 import { revisar } from './guardias.mjs'
+import { rutaGenerica } from './esquema.mjs'
 import { EVENTO, registrar, leer, verificarCadena } from './ledger.mjs'
 import { proyectar } from './proyeccion.mjs'
 import { ESTADOS, ORIGENES, esLegal } from './estado.mjs'
@@ -33,10 +34,27 @@ import { ESTADOS, ORIGENES, esLegal } from './estado.mjs'
  * @param {string} opciones.id        identificador del expediente
  * @param {function} [opciones.ahora] devuelve el instante ISO. Se inyecta.
  */
-export function abrirExpediente ({ ruta, esquema, id, ahora = () => new Date().toISOString() }) {
+export function abrirExpediente ({
+  ruta, esquema, id,
+  ahora = () => new Date().toISOString(),
+  // ── LAS GUARDIAS DE DOMINIO SE INYECTAN ──────────────────────────────────
+  //
+  // `core/` NO importa instancias/banca/guardias.mjs, y esa línea es la que
+  // sostiene toda la genericidad del proyecto: si el núcleo importara la cédula
+  // panameña, «el mismo código sirve para inventario hospitalario» dejaría de
+  // ser cierto en el mismo instante.
+  //
+  // Quien abre el expediente decide qué reglas de negocio aplican. El núcleo
+  // solo sabe que existe una función y que devuelve rechazos.
+  guardiasDominio = null,
+  contextoDominio = {}
+}) {
   if (!ruta)     throw new Error('abrirExpediente necesita la ruta del ledger')
   if (!esquema)  throw new Error('abrirExpediente necesita un esquema')
   if (!id)       throw new Error('abrirExpediente necesita un id de expediente')
+  if (guardiasDominio !== null && typeof guardiasDominio !== 'function') {
+    throw new TypeError('guardiasDominio debe ser una función (campo, contexto) => rechazos')
+  }
 
   const hecho = (tipo, campos = {}) =>
     registrar(ruta, { tipo, expediente: id, ts: ahora(), ...campos })
@@ -84,7 +102,39 @@ export function abrirExpediente ({ ruta, esquema, id, ahora = () => new Date().t
       const fuente = exp.fuentes.map(f => f.texto).join('\n')
       if (!fuente) throw new Error('No se puede asentar sin haber capturado antes: no hay fuente contra la que anclar')
 
-      const { campos, resumen } = revisar(extraido, esquema, fuente)
+      const revisionNucleo = revisar(extraido, esquema, fuente)
+
+      // Las de dominio corren DESPUÉS de las de núcleo y solo sobre lo que
+      // sobrevivió: no tiene sentido preguntar si una cédula es de una provincia
+      // que existe cuando esa cédula ni siquiera ancló en el texto.
+      const campos = guardiasDominio
+        ? revisionNucleo.campos.map(c => {
+            if (!c.aceptado) return c
+            const extra = guardiasDominio({ ruta: c.ruta, valor: c.valor, cita: c.cita }, contextoDominio)
+            if (!extra?.length) return c
+            return Object.freeze({
+              ...c,
+              aceptado: false,
+              propuesto: c.valor,
+              valor: esquema.vacios?.[typeof c.valor === 'number' ? 'numero' : 'texto'] ?? 'DESCONOCIDO',
+              evidencia: 'Desconocido',
+              rechazos: Object.freeze([...c.rechazos, ...extra])
+            })
+          })
+        : revisionNucleo.campos
+
+      const rechazados = campos.filter(c => !c.aceptado).length
+      const resumen = Object.freeze({
+        ...revisionNucleo.resumen,
+        aceptados: campos.length - rechazados,
+        rechazados,
+        // Un crítico que las guardias de DOMINIO tumbaron cuenta igual que uno
+        // que nunca vino: el expediente no puede cerrar con él.
+        faltanCriticos: Object.freeze((esquema.camposCriticos ?? []).filter(cr =>
+          !campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))),
+        completo: (esquema.camposCriticos ?? []).every(cr =>
+          campos.some(c => rutaGenerica(c.ruta) === cr && c.aceptado))
+      })
 
       hecho(EVENTO.EXTRACCION, { origen, datos: { campos: campos.length } })
       transitarSiPuede(ESTADOS.EXTRAIDO, origen)

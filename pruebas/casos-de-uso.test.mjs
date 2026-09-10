@@ -18,7 +18,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -26,6 +26,7 @@ import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente, aCsv } from '../core/expediente.mjs'
 import { ORIGENES } from '../core/estado.mjs'
 import { RECHAZO } from '../core/guardias.mjs'
+import { revisarDominio } from '../instancias/banca/guardias.mjs'
 
 const ESQ = cargarEsquema('instancias/banca/esquema.json')
 
@@ -405,4 +406,108 @@ test('CU-14 · dos sucursales con los mismos hechos producen el MISMO expediente
   }
   const primero = correr()
   for (let i = 0; i < 20; i++) assert.equal(correr(), primero)
+})
+
+// ═════════════════════════════════════════════════════════════════════
+//  CASO 15 · Las guardias de DOMINIO, conectadas por inyección
+// ═════════════════════════════════════════════════════════════════════
+
+test('CU-15 · una cédula de una provincia INEXISTENTE no entra, aunque ancle', () => {
+  // El caso completo: la cita es real, el valor sale de ella, el anclaje pasa…
+  // y aun así G6 lo para, porque en Panamá no hay provincia 0. Es un error de
+  // OCR que ningún modelo detecta, porque produce una cédula que parece válida.
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-dominio-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-DOM',
+      ahora: () => `2026-09-10T15:${String(n++).padStart(2, '0')}:00.000Z`,
+      guardiasDominio: revisarDominio,
+      contextoDominio: { hoy: new Date(Date.UTC(2026, 8, 10)) }
+    })
+
+    exp.capturar('El titular es Juan Pérez González, cédula 0-123-456. ' +
+                 'Presenta el recibo del IDAAN del 12 de marzo de 2026 por 45.30 balboas.')
+    const { revision } = exp.asentar({
+      titular: {
+        nombre: { valor: 'Juan Pérez González', cita: 'El titular es Juan Pérez González' },
+        cedula: { valor: '0-123-456', cita: 'cédula 0-123-456' }      // ← ancla, y aun así es imposible
+      },
+      documentos: []
+    })
+
+    const cedula = revision.campos.find(c => c.ruta === 'titular.cedula')
+    assert.equal(cedula.aceptado, false, 'anclar no basta: la cédula tiene que ser posible')
+    assert.ok(cedula.rechazos.some(r => r.guardia === 'G6'))
+    assert.match(cedula.rechazos.find(r => r.guardia === 'G6').detalle, /provincia 0/)
+
+    const e = exp.leer()
+    assert.equal(e.estado, 'VALIDADO', 'sin cédula válida no llega a COMPLETO')
+    assert.equal(e.huecos['titular.cedula'].guardias.includes('G6'), true)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('CU-16 · un recibo VENCIDO se marca, con los días', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-vencido-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-V',
+      ahora: () => `2026-09-10T16:${String(n++).padStart(2, '0')}:00.000Z`,
+      guardiasDominio: revisarDominio,
+      contextoDominio: { hoy: new Date(Date.UTC(2026, 8, 10)), diasMaximos: 90 }
+    })
+    exp.capturar(DICTADO)
+    const { revision } = exp.asentar(EXTRACCION_BUENA)
+
+    const fecha = revision.campos.find(c => c.ruta === 'documentos[0].fecha_emision')
+    assert.equal(fecha.aceptado, false, 'el 12 de marzo son más de 90 días antes del 10 de septiembre')
+    assert.match(fecha.rechazos.find(r => r.guardia === 'G7').detalle, /182 días/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('CU-17 · ⭐ el NÚCLEO no sabe qué es un banco, y hay que poder demostrarlo', () => {
+  // Es la afirmación que sostiene toda la genericidad: si core/ importara la
+  // cédula panameña, «el mismo código sirve para inventario hospitalario»
+  // dejaría de ser cierto en ese mismo instante.
+  // SEXTO falso positivo del proyecto, y otra vez por buscar texto donde hacía
+  // falta mirar estructura: la primera versión de este test buscaba la cadena
+  // "instancias/banca" en el fuente y la encontraba en COMENTARIOS que explican
+  // que el esquema se puede cambiar. Lo que importa no es que el núcleo NOMBRE
+  // el dominio: es que no lo IMPORTE.
+  const MODULOS = ['esquema', 'estado', 'anclaje', 'guardias', 'ledger',
+                   'proyeccion', 'dedup', 'calidad', 'expediente', 'serie', 'prompt']
+
+  for (const f of MODULOS) {
+    const src = readFileSync(new URL(`../core/${f}.mjs`, import.meta.url), 'utf8')
+    const imports = [...src.matchAll(/^\s*import\s[^;]*?from\s*['"]([^'"]+)['"]/gm)].map(m => m[1])
+    for (const spec of imports) {
+      assert.ok(!/instancias/.test(spec),
+        `core/${f}.mjs IMPORTA "${spec}": el núcleo dejó de ser genérico en ese instante`)
+      assert.ok(!/@qvac/.test(spec),
+        `core/${f}.mjs IMPORTA el SDK: la frontera 95/5 se rompió`)
+    }
+  }
+
+  // Y sin guardias inyectadas, la misma cédula imposible SÍ pasa el núcleo:
+  // la prueba de que el rechazo vino del dominio y no de core/.
+  const dir = mkdtempSync(join(tmpdir(), 'expediente-generico-'))
+  try {
+    let n = 0
+    const exp = abrirExpediente({
+      ruta: join(dir, 'e.jsonl'), esquema: ESQ, id: 'EXP-G',
+      ahora: () => `2026-09-10T17:${String(n++).padStart(2, '0')}:00.000Z`
+      // ← sin guardiasDominio
+    })
+    exp.capturar('El titular es Ana Ruiz, cédula 0-123-456.')
+    const { revision } = exp.asentar({
+      titular: {
+        nombre: { valor: 'Ana Ruiz', cita: 'El titular es Ana Ruiz' },
+        cedula: { valor: '0-123-456', cita: 'cédula 0-123-456' }
+      },
+      documentos: []
+    })
+    assert.equal(revision.campos.find(c => c.ruta === 'titular.cedula').aceptado, true,
+      'sin las guardias de banca, el núcleo acepta: no sabe que la provincia 0 no existe')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
