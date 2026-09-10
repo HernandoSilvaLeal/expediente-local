@@ -108,18 +108,43 @@ export function normalizar (s) {
  * @returns {boolean}
  */
 export function citaEstaEnFuente (cita, fuente) {
-  const c = normalizar(cita)
-  const f = normalizar(fuente)
-  if (!c || !f) return false
+  return apareceComoPalabra(normalizar(cita), normalizar(fuente))
+}
 
-  // Se recorren TODAS las apariciones, no solo la primera: una cita puede salir
-  // a mitad de palabra en un sitio y bien delimitada en otro, y en ese caso la
-  // fuente sí la dice.
+/**
+ * ¿Aparece `aguja` dentro de `pajar` con FRONTERA a los dos lados?
+ *
+ * Los dos argumentos vienen ya normalizados. Como `normalizar()` deja solo
+ * letras, números y espacios simples, la frontera es el espacio o el borde de
+ * la cadena — no hace falta una expresión regular construida a partir de la
+ * aguja, que además habría que escapar.
+ *
+ * ── ES LA MISMA REGLA EN CUATRO SITIOS, Y POR ESO VIVE AQUÍ ────────────────
+ *
+ * Una auditoría adversarial encontró el mismo fallo de substring en cuatro
+ * funciones distintas de este archivo, todas escritas con `includes`:
+ *
+ *   · la cita:      «500 balboas» anclaba contra «4500 balboas»
+ *   · el número:    el valor 3 anclaba contra «trescientos», el 1 contra «junio»
+ *   · el valor:     un texto anclaba dentro de otra palabra
+ *   · el lenguaje:  «dice» dentro de «índice» subía un dato llano a Confirmado
+ *
+ * Cuatro apariciones del mismo error no son cuatro descuidos: son una regla que
+ * no estaba escrita en ningún sitio y que cada función tuvo que inventar por su
+ * cuenta. Ahora está escrita una vez, y las cuatro la llaman.
+ *
+ * Se recorren TODAS las apariciones, no solo la primera: una aguja puede salir
+ * a mitad de palabra en un sitio y bien delimitada en otro. Negarlo sería el
+ * error contrario —un hueco donde no lo hay— y también hace daño, porque manda
+ * al oficial a repreguntar por algo que ya tiene delante.
+ */
+function apareceComoPalabra (aguja, pajar) {
+  if (!aguja || !pajar) return false
   for (let desde = 0; ; desde++) {
-    const i = f.indexOf(c, desde)
+    const i = pajar.indexOf(aguja, desde)
     if (i === -1) return false
-    const abre = i === 0 || f[i - 1] === ' '
-    const cierra = i + c.length === f.length || f[i + c.length] === ' '
+    const abre = i === 0 || pajar[i - 1] === ' '
+    const cierra = i + aguja.length === pajar.length || pajar[i + aguja.length] === ' '
     if (abre && cierra) return true
     desde = i
   }
@@ -140,9 +165,17 @@ export function valorEstaEnCita (valor, cita) {
   if (!c) return false
 
   if (typeof valor === 'number') {
-    // 1 · Su forma escrita: "tres" ancla al 3
+    // 1 · Su forma escrita: "tres" ancla al 3 — PERO COMO PALABRA COMPLETA.
+    //
+    // Medido por una auditoría adversarial: con `c.includes(enLetra)`, el valor
+    // 3 anclaba contra «trescientos balboas» y el dataset guardaba 3 donde la
+    // fuente decía 300, sellado como Confirmado. Un error de factor cien en un
+    // campo de dinero. El 1 anclaba contra «junio» («un» va dentro), y el 100
+    // contra «paciente» («cien» va dentro) — este último en el dominio de
+    // salud, con el mismo núcleo y otro .json, que es justo lo que demuestra
+    // que el fallo era del core y no de una instancia.
     const enLetra = NUMERO_A_PALABRA[valor]
-    if (enLetra !== undefined && c.includes(enLetra)) return true
+    if (enLetra !== undefined && apareceComoPalabra(enLetra, c)) return true
 
     // 2 · Comparación NUMÉRICA contra los números de la cita original.
     //     No sirve comparar texto: normalizar() quita la puntuación, así que
@@ -153,16 +186,55 @@ export function valorEstaEnCita (valor, cita) {
 
   const v = normalizar(valor)
   if (!v) return false
-  return c.includes(v)
+  return apareceComoPalabra(v, c)
 }
 
-/** Extrae los números de un texto, aceptando punto o coma como separador decimal. */
+/**
+ * Extrae los números de un texto.
+ *
+ * ── LA COMA NO SIEMPRE ES UN DECIMAL, Y TRATARLA ASÍ COSTABA UN FACTOR MIL ──
+ *
+ * Esto era `s.replace(',', '.')`, sin más. Medido por una auditoría adversarial:
+ *
+ *   fuente:   «el salario mensual es de 1,250 balboas»
+ *   numerosDe devolvía [1.25]
+ *
+ *   · el dato VERDADERO se rechazaba: valor 1250 no anclaba, y el campo se
+ *     sustituía por 0. El expediente perdía el salario real.
+ *   · el dato FALSO se aceptaba: valor 1.25 anclaba y quedaba registrado. Un
+ *     salario de mil doscientos cincuenta balboas entraba como uno con
+ *     veinticinco.
+ *
+ * En un expediente bancario ese número decide si alguien califica. Errar por
+ * mil hacia abajo no es un decimal mal puesto: es una denegación.
+ *
+ * La regla es determinista y se declara: un separador seguido de EXACTAMENTE
+ * TRES dígitos que no son el final del número es separador de MILES. Con una,
+ * dos, o más de tres cifras detrás, es DECIMAL. Cuando aparecen los dos
+ * separadores, manda el último — «1,250.75» son mil doscientos cincuenta con
+ * setenta y cinco.
+ *
+ * Se elige una interpretación y se cumple siempre. Aceptar las dos «por si
+ * acaso» sería reabrir el agujero: haría anclar tanto el valor verdadero como
+ * el falso, que es exactamente lo que no puede pasar.
+ */
 export function numerosDe (texto) {
   if (typeof texto !== 'string') return []
-  const encontrados = texto.match(/\d+(?:[.,]\d+)?/g) ?? []
-  return encontrados
-    .map(s => Number(s.replace(',', '.')))
-    .filter(n => Number.isFinite(n))
+  // Captura el número ENTERO con sus separadores, no trozos sueltos.
+  const encontrados = texto.match(/\d+(?:[.,]\d+)*/g) ?? []
+  return encontrados.map(aNumero).filter(n => Number.isFinite(n))
+}
+
+function aNumero (crudo) {
+  const partes = crudo.split(/[.,]/)
+  if (partes.length === 1) return Number(crudo)
+
+  // El último separador decide: si lo que va detrás son exactamente tres
+  // dígitos, era un grupo de millares y el número no tiene decimales.
+  const ultima = partes.at(-1)
+  const hayDecimal = ultima.length !== 3
+  const entero = (hayDecimal ? partes.slice(0, -1) : partes).join('')
+  return Number(hayDecimal ? `${entero}.${ultima}` : entero)
 }
 
 const NUMERO_A_PALABRA = Object.freeze({
@@ -215,22 +287,57 @@ export function anclar (campo, fuente) {
  *   "ocho años"                    → Reportado
  */
 export function gradoDeEvidencia (cita, fuente) {
-  const ventana = normalizar(contexto(cita, fuente))
+  const ventana = contexto(cita, fuente)
 
-  if (ATENUADORES.some(a => ventana.includes(normalizar(a)))) return 'Estimado'
-  if (AFIRMADORES.some(a => ventana.includes(normalizar(a)))) return 'Confirmado'
+  // ── LOS MARCADORES, POR PALABRA COMPLETA ─────────────────────────────────
+  //
+  // Esto era `ventana.includes(normalizar(a))`. Medido por una auditoría
+  // adversarial: la fuente «El indice de morosidad del cliente es 3» no contiene
+  // ningún afirmador, pero normalizar('indice') contiene 'dice'. Un dato llano
+  // salía con el sello de evidencia MÁS ALTO que el sistema puede otorgar.
+  //
+  // Y no es rebuscado: «índice», «bendice», «predice», «juzgado» —que contiene
+  // 'juzga'— aparecen en documentos financieros todo el rato.
+  const hay = (lista) => lista.some(a => apareceComoPalabra(normalizar(a), ventana))
+
+  if (hay(ATENUADORES)) return 'Estimado'
+  if (hay(AFIRMADORES)) return 'Confirmado'
   return 'Reportado'
 }
 
-/** Devuelve la cita más 40 caracteres a cada lado, para leer cómo se dijo. */
+/**
+ * La cita más 40 caracteres a cada lado, YA NORMALIZADA, para leer cómo se dijo.
+ *
+ * ── SE INDEXABA SOBRE UN TEXTO Y SE CORTABA SOBRE OTRO ────────────────────
+ *
+ * El índice salía de `normalizar(f)` y el corte se hacía sobre `f`. El propio
+ * comentario lo admitía: «se aproxima sobre el original». Esa aproximación es
+ * el fallo, porque normalizar cambia la longitud del texto —cada tilde, cada
+ * signo de puntuación, cada espacio repetido desplaza todo lo que viene detrás—
+ * y el desfase crece con el documento.
+ *
+ * Medido por una auditoría adversarial, con un encabezado normal de documento
+ * escaneado:
+ *
+ *   «Certificado.\n» + «=» × 80 + «\nEl monto parece ser 4500 balboas.»
+ *
+ *   índice normalizado de la cita:  32
+ *   índice real en el original:    114
+ *
+ * La ventana leída era el encabezado: nunca veía «parece», sí veía
+ * «Certificado». Resultado: **Confirmado** sobre un dato que la propia fuente
+ * da por incierto. El grado más alto de la escala, exactamente al revés.
+ *
+ * El arreglo es no tener dos textos: se indexa y se corta sobre el mismo, el
+ * normalizado. La ventana solo sirve para buscar marcadores de lenguaje, que ya
+ * se comparan normalizados, así que no se pierde nada por el camino.
+ */
 function contexto (cita, fuente, margen = 40) {
-  const f = String(fuente)
-  const i = normalizar(f).indexOf(normalizar(cita))
-  if (i === -1) return cita
-  // El índice es sobre el texto normalizado; se aproxima sobre el original.
-  const desde = Math.max(0, i - margen)
-  const hasta = Math.min(f.length, i + normalizar(cita).length + margen)
-  return f.slice(desde, hasta)
+  const f = normalizar(fuente)
+  const c = normalizar(cita)
+  const i = f.indexOf(c)
+  if (i === -1) return c
+  return f.slice(Math.max(0, i - margen), Math.min(f.length, i + c.length + margen))
 }
 
 /**
