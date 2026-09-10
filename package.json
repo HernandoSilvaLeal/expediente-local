@@ -14,6 +14,8 @@
     "smoke": "node scripts/smoke.mjs",
     "test": "node --test pruebas/*.test.mjs",
     "test:frontera": "node scripts/verificar-frontera.mjs",
+    "metricas": "node scripts/metricas.mjs",
+    "metricas:json": "node scripts/metricas.mjs --json",
     "verify:offline": "bash scripts/verify-offline.sh",
     "audit:all": "bash scripts/audit-all.sh"
   },

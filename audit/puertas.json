@@ -1,0 +1,29 @@
+{
+  "_": "LAS CASILLAS QUE UN COMANDO NO PUEDE MEDIR. Solo estas se marcan a mano.",
+  "_regla": "Si una casilla se puede verificar por comando, NO va aquí: va medida en scripts/metricas.mjs. Meter aquí algo medible es hacerse trampa al solitario.",
+  "_como": "Poner true SOLO después de ejecutar el comando de la casilla y ver el resultado con los propios ojos. La fecha va en _bitacora.",
+
+  "bronce_sin_red": false,
+  "bronce_readme_instalacion": false,
+
+  "plata_casos_crudo": false,
+  "plata_audit_all": false,
+
+  "oro_p2p_fisico": false,
+  "oro_voz": false,
+  "oro_delegacion": false,
+  "oro_segundo_dominio": false,
+
+  "desc_base_preexistente": false,
+  "desc_video_duracion": false,
+  "desc_video_acceso": false,
+  "desc_sin_rutas_absolutas": false,
+  "desc_sin_placeholders": false,
+  "desc_repo_publico": false,
+  "desc_clon_limpio": false,
+  "desc_formulario": false,
+
+  "_bitacora": {
+    "oro_p2p_fisico": "9-sep 23:0x — DIAGNOSTICADO, NO LOGRADO. Los dos pares se anuncian y no se encuentran. TCP pasa (SSH funciona), UDP no llega: paquete enviado desde el portátil, cero recibidos en la torre. Cortafuegos descartado (reglas en Any). Causa probable: aislamiento de clientes en el repetidor TP-Link. Firma: 18,2 s constantes de anuncio contra 0,1 s en loopback. Salida pendiente: hotspot del celular."
+  }
+}
