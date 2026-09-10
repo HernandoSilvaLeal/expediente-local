@@ -406,65 +406,7 @@ function cablearConflictos (id) {
           return
         }
         await abrirExpediente(id)
-        await /**
- * El texto de origen con cada anclaje resaltado.
- *
- * Es la respuesta visual a «¿de dónde sacaste esto?», y no hay que creerse
- * nada: el trozo pintado ES el que el código encontró con indexOf, en la
- * posición que guardó al anclarlo.
- *
- * Se pinta sobre el texto NORMALIZADO porque es sobre el que se midió. Enseñar
- * el original con posiciones del normalizado desplazaría los resaltados — es el
- * mismo desfase que ya rompió una vez la ventana de contexto, y aquí se vería.
- */
-function resaltar (e) {
-  const texto = (e.fuentes || []).map(f => f.texto).join('\n')
-  const norm = normalizar(texto)
-  if (!norm) return ''
-
-  const tramos = Object.values(e.campos)
-    .filter(c => c.donde)
-    .map(c => ({ ...c.donde, ruta: c.ruta, evidencia: c.evidencia }))
-    .sort((a, b) => a.desde - b.desde)
-
-  let salida = '', cursor = 0
-  for (const t of tramos) {
-    if (t.desde < cursor) continue                 // solapado: ya está pintado
-    salida += esc(norm.slice(cursor, t.desde))
-    salida += `<mark class="ev-${esc(t.evidencia)}" title="${esc(t.ruta)}">` +
-              esc(norm.slice(t.desde, t.hasta)) + '</mark>'
-    cursor = t.hasta
-  }
-  return salida + esc(norm.slice(cursor))
-}
-
-/** La misma normalización que core/anclaje.mjs. Si divergen, el resaltado miente. */
-function normalizar (s) {
-  return String(s ?? '')
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
-}
-
-// ── LA IDENTIDAD DEL EQUIPO ───────────────────────────────────────────────
-//
-// Se guarda en este navegador y NO viaja a ningún sitio salvo dentro de la
-// firma que la persona envía. Es lo que hace que la tableta de Marta sea «la
-// tableta de Marta» sin haber instalado nada en ella.
-//
-// Y se dice lo que es: una comodidad. La identidad verificada la pondría el
-// directorio del banco; aquí no la hay, y está declarado en el README.
-const QUIEN = 'expediente-local:quien'
-const quien = () => { try { return localStorage.getItem(QUIEN) || '' } catch { return '' } }
-
-$('#quien').value = quien()
-$('#quien').title = 'Se recuerda en este equipo. No es autenticación: la identidad ' +
-                    'verificada la pone el sistema del banco.'
-$('#quien').addEventListener('input', e => {
-  try { localStorage.setItem(QUIEN, e.target.value) } catch { /* modo privado: se sigue */ }
-  for (const c of document.querySelectorAll('[data-of]')) if (!c.dataset.tocado) c.value = e.target.value
-})
-
-cargarLista()
+        await cargarLista()
       } catch (e) {
         error.textContent = e.message
         error.hidden = false

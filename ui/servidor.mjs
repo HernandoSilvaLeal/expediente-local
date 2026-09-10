@@ -25,7 +25,7 @@
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { join, dirname, extname } from 'node:path'
+import { join, resolve, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { cargarEsquema } from '../core/esquema.mjs'
@@ -43,7 +43,11 @@ const argv = process.argv.slice(2)
 const arg = (n, d) => { const i = argv.indexOf('--' + n); return i === -1 ? d : argv[i + 1] }
 
 const PUERTO = Number(arg('puerto', process.env.PORT ?? '7301'))
-const DATOS = join(RAIZ, arg('datos', 'datos'))
+// `resolve` y no `join`: con `join`, una ruta absoluta se CONCATENA a la raíz
+// del proyecto —«/proyecto» + «/tmp/x» = «/proyecto/tmp/x»— y el servidor mira
+// donde no hay nada, sin decir una palabra. `resolve` respeta la absoluta y
+// sigue resolviendo la relativa contra la raíz, que es lo que se espera.
+const DATOS = resolve(RAIZ, arg('datos', 'datos'))
 const esquema = cargarEsquema(arg('esquema', 'instancias/banca/esquema.json'))
 // El reloj se puede fijar aquí igual que en el CLI: si no, los expedientes
 // de ejemplo caducan solos y la interfaz enseña rechazos que no son reales.

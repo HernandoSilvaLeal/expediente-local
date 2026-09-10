@@ -74,7 +74,7 @@ cd expediente-local && npm ci
 
 | Qué quieres comprobar | Comando | Qué sale |
 |---|---|---|
-| Que el núcleo funciona | `npm test` | **324 tests** en menos de un segundo |
+| Que el núcleo funciona | `npm test` | **337 tests** en menos de un segundo |
 | Que el núcleo **no puede** tocar el modelo | `npm run test:frontera` | falla con código 1 si `core/` importa el SDK |
 | Que el sistema **corre sin red** | `unshare -rn bash -c 'npm run smoke'` | `lo: DOWN`, `curl → 000`, y JSON válido |
 | Que nada descalifica | `npm run verify:entrega` | **13 puertas**, cada una eliminatoria |
@@ -265,7 +265,7 @@ cd expediente-local
 npm ci                    # NO uses `npm install`: el SDK va fijado exacto a 0.18.2
 
 # 3 · Comprobar que funciona                       (1 s)
-npm test                  # 324 tests, sin modelo y sin red
+npm test                  # 337 tests, sin modelo y sin red
 npm run smoke             # el flujo completo. Sale JSON y código 0
 
 # 4 · Modelos — SOLO si quieres extracción con IA  (pendiente de cronometrar)
@@ -280,7 +280,7 @@ Medido el 10-sep-2026 en un `HOME` nuevo, **sin caché de npm**, clonando desde 
 |---|---|
 | `git clone` | 2 s |
 | `npm ci` (217 paquetes, sin caché) | 190 s |
-| `npm test` → **324/324** | 1 s |
+| `npm test` → **337/337** | 1 s |
 | **TOTAL** | **193 s** |
 
 Y en ese clon recién hecho: frontera intacta, `npm run smoke` en verde y **todas las
@@ -344,7 +344,7 @@ Si `core/` importara la cédula panameña, esta sección seguiría estando escri
 
 | | |
 |---|---|
-| Tests | **324 / 324** verdes, sin modelo y sin red |
+| Tests | **337 / 337** verdes, sin modelo y sin red |
 | De ellos, prueban que algo **NO** se puede | **195 de 322 → 60,6 %** |
 | Casos de uso punta a punta | **25** |
 | Casos trampa, uno por guardia | **17 / 17** — cobertura G1..G10 completa |
