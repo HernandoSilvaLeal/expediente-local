@@ -32,12 +32,45 @@ el núcleo importa el SDK.
 
 | | |
 |---|---|
-| **Equipo** | DevCors — Hernando Silva Leal |
-| **Evento** | Decentralized AI Hackathon · ISD / Tether-QVAC · septiembre 2026 |
+| **Equipo** | DevCors — Hernando Silva Leal ([nandodev.me](https://nandodev.me)) |
+| **Evento** | Decentralized AI Hackathon · ISD / Tether-QVAC · Panamá, septiembre 2026 |
 | **Desafíos** | AI Descentralizada para la Banca (Caja de Ahorros) · Sovereign Intelligence at the Edge |
-| **Video** | *(pendiente)* |
 | **SDK** | `@qvac/sdk@0.18.2` — **versión fijada exacta**, sin `^`, sin `latest` |
 | **Inferencia** | **100 % en el dispositivo.** Cero llamadas a APIs de IA |
+| **Video** | **[youtu.be/FRPlIQDxegg](https://youtu.be/FRPlIQDxegg)** |
+| **Licencia** | MIT |
+
+---
+
+## 📦 LOS ENTREGABLES
+
+**Todo lo que hay que ver para evaluar este proyecto, en un solo sitio:**
+
+### 🎥 [VER EL VIDEO](https://youtu.be/FRPlIQDxegg) · 📁 [CARPETA DE ENTREGABLES](https://drive.google.com/drive/folders/1Pe-nonKNENkvO5BcTYW4CjUHPUgJfRy3)
+
+| | Entregable | Para quién | Qué responde |
+|---|---|---|---|
+| 🎥 | **[Video de demostración](https://youtu.be/FRPlIQDxegg)** | todos | *¿funciona de verdad?* — el sistema corriendo sin internet, el conflicto que se detiene, el control dual y la firma |
+| 📊 | **Presentación** | jurado | *¿por qué importa?* — el problema, la solución y la evidencia, en slides |
+| 📕 | **Informe técnico** (PDF) | evaluador técnico | *¿cómo está construido?* — arquitectura, guardias, máquina de estados, los números con su comando |
+| 📗 | **Informe de negocio** (PDF) | banco · cumplimiento | *¿qué problema resuelve?* — los cinco cargos que lo sufren y el Acuerdo 1-2026 por artículo |
+| 📄 | **Documento maestro** (Markdown) | quien quiera el fondo | el proyecto entero, exhaustivo, sin resumir |
+| 💻 | **Este repositorio** | quien quiera comprobarlo | el código, los tests y los comandos que sostienen cada afirmación |
+
+> **La diferencia entre los dos PDF:** el técnico enseña **cómo se impide** que
+> un dato falso entre. El de negocio enseña **qué le cuesta hoy** a un banco que
+> entre. Son el mismo problema visto desde los dos lados de la mesa.
+
+### ⚡ Y si solo tienes dos minutos
+
+```bash
+git clone https://github.com/HernandoSilvaLeal/expediente-local
+cd expediente-local && npm ci && npm run demo && npm start
+```
+
+Abre `http://127.0.0.1:7301` y entra en **EXP-003**. Ahí está el argumento
+entero: dos documentos que se contradicen, y un sistema que **se detiene** en
+vez de elegir por ti.
 
 ---
 
@@ -610,3 +643,19 @@ de commits es la evidencia (art. 11b).
 ## Licencia
 
 Apache-2.0 — ver [LICENSE](LICENSE).
+
+---
+
+## La frase con la que se cierra
+
+> **Su proveedor de biometría le dirá si la cara coincide con la cédula.**
+>
+> **Nadie le va a decir si el dato que entró al expediente estaba de verdad en el
+> documento — y eso es lo que le van a preguntar dentro de cuatro años.**
+
+---
+
+<p align="center">
+  <b>Expediente Local</b> · DevCors · Panamá, septiembre de 2026<br>
+  <i>el modelo propone · el código decide · una persona firma</i>
+</p>
