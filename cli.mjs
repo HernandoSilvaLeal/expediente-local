@@ -189,7 +189,19 @@ async function capturar () {
 
   const extractor = crearExtractor({
     modelSrc: op.modelo,
-    delegate: op.proveedor ? { providerPublicKey: op.proveedor } : null
+    delegate: op.proveedor ? { providerPublicKey: op.proveedor } : null,
+    // ── EL PRESUPUESTO DE TOKENS SALE DEL ESQUEMA, NO DE UNA CORAZONADA ──────
+    //
+    // Con el valor por defecto el modelo se quedaba sin tokens a mitad del JSON
+    // y devolvía una cadena sin cerrar. El diagnóstico era engañoso —«devolvió
+    // algo que no es JSON válido»— cuando el JSON iba bien y lo que faltaba era
+    // sitio para terminarlo.
+    //
+    // Un número fijo aquí volvería a romperse el día que el esquema crezca, que
+    // es justo lo que pasó: el artículo 18 subió los campos críticos de 2 a 19.
+    // Así que se calcula: cada campo cuesta su valor más su cita, y una cita es
+    // una frase del documento. ~110 tokens por campo, con suelo generoso.
+    predict: op.predict ? Number(op.predict) : Math.max(700, esquema.camposCriticos.length * 110)
   })
 
   try {

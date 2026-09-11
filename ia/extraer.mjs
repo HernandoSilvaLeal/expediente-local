@@ -66,6 +66,7 @@ export class ExtraccionRechazada extends Error {
 /**
  * @param {object} opciones
  * @param {string} opciones.modelSrc      ruta o constante de modelo del SDK
+ * @param {string} [opciones.modelType]   motor del SDK. Por defecto el de completado
  * @param {object} [opciones.delegate]    {providerPublicKey, timeout, fallbackToLocal}
  * @param {object} [opciones.modelConfig] ctx_size, gpu_layers, device…
  * @param {number} [opciones.plazoMs]     plazo por extracción
@@ -73,6 +74,21 @@ export class ExtraccionRechazada extends Error {
  */
 export function crearExtractor ({
   modelSrc,
+  // ── POR QUÉ ESTO TIENE UN VALOR POR DEFECTO ────────────────────────────────
+  //
+  // El SDK 0.18.2 EXIGE `modelType` cuando `modelSrc` es una ruta a un fichero:
+  // un `.gguf` suelto no lleva metadatos que digan con qué motor se abre, y el
+  // SDK se niega a adivinarlo. Sin esto, la carga falla con «modelType is
+  // required» ANTES de tocar el modelo.
+  //
+  // No se vio hasta ahora porque `malla/node_modules/@qvac` era un enlace al
+  // SDK 0.19.0 de otro proyecto, que sí lo infería. Al instalar la versión que
+  // el proyecto declara —que es lo correcto— apareció.
+  //
+  // Es exactamente el fallo que la puerta del SDK existía para impedir: que la
+  // versión instalada no fuera la declarada. La puerta tenía razón durante días
+  // y lo que tapaba era esto.
+  modelType = 'llamacpp-completion',
   delegate = null,
   modelConfig = { ctx_size: 4096 },
   plazoMs = 30_000,
@@ -91,7 +107,7 @@ export function crearExtractor ({
   // simultáneas son dos cargas de verdad. Y es `memorizar`, no `coalescer`:
   // un modelo cargado se queda cargado (ver core/serie.mjs y T6a-M1).
   const cargar = memorizar(async () => {
-    const params = { modelSrc, modelConfig }
+    const params = { modelSrc, modelType, modelConfig }
 
     // TRAMPA · `delegate` va en loadModel, NO en completion. Verificado en el
     // ejemplo oficial dist/examples/delegated-inference/consumer.js.
