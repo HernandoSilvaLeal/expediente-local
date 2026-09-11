@@ -398,9 +398,32 @@ atrevimiento.
 
 | Indicador | Qué dice | Medido |
 |---|---|---|
-| **Tasa de anclaje** | de lo que el modelo propuso, cuánto traía una cita que existe | **90,9 %** |
+| **Tasa de anclaje** | de lo propuesto, cuánto traía una cita que existe | **90,9 %** |
 | **Tasa de respaldo** | de lo anclado, cuánto lo **afirma** la fuente | **100 %** |
 | Parados por una guardia | rechazos, que son la evidencia de que el sistema trabajó | **3**, todos G3 |
+
+> ### ⚠️ De dónde sale ese 90,9 %, y por qué NO es la tasa de un modelo
+>
+> Los 66 campos que mide esa tabla **no los propuso un modelo**: salen de los
+> archivos de `instancias/banca/seed/`, escritos a mano para reproducir errores
+> que un modelo comete de verdad. Miden **cómo se comportan las guardias ante
+> una entrada conocida**, no qué tan bien extrae un modelo.
+>
+> **La tasa con un modelo real es otra, y es mucho peor.** Medido el 11-sep-2026
+> con **MedPsy 1.7B** sobre `dictado-01.txt`, en esta máquina:
+>
+> ```
+> el modelo propuso 22 campos → 2 anclaron · 20 rechazados (G3, G4)
+> tasa de anclaje real: 9,1 %
+> ```
+>
+> Se publican las dos porque miden cosas distintas, y fundirlas en un número
+> sería exactamente el fallo que este proyecto existe para atacar. **La que hay
+> que mirar para juzgar el extractor es la segunda.** La primera juzga las
+> guardias.
+>
+> Que un modelo de 1.700 millones de parámetros ancle 2 de 22 no es un fallo del
+> sistema: es el sistema haciendo su trabajo. Lo que no se puede probar, no entra.
 | Sin cita **por diseño** | enums como el tipo de documento: su defensa es G2, no el anclaje | **3** |
 
 El denominador es **todo lo propuesto**, no lo aceptado: medir solo sobre lo que

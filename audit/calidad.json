@@ -1,14 +1,14 @@
 {
   "_": "Calidad del dataset producido. Mide qué sobrevive a las guardias, no cuánto se llenó.",
-  "fecha": "2026-09-10T22:29:26.048Z",
+  "fecha": "2026-09-11T12:12:01.150Z",
   "dominio": "banca",
-  "expedientes": 5,
+  "expedientes": 4,
   "propuestos": 66,
   "en_expediente": 63,
   "anclados": 60,
   "sin_cita_por_diseno": 3,
   "huecos": 3,
-  "conflictosAbiertos": 0,
+  "conflictosAbiertos": 1,
   "tasa_anclaje_pct": 90.9,
   "tasa_respaldo_pct": 100,
   "por_evidencia": {
@@ -20,7 +20,7 @@
   "parados_por_guardia": {
     "G3": 3
   },
-  "firmados": 2,
+  "firmados": 1,
   "sin_firmar": 3,
   "detalle": [
     {
@@ -49,25 +49,13 @@
     },
     {
       "id": "EXP-003",
-      "estado": "APROBADO",
+      "estado": "COMPLETO",
       "propuestos": 22,
       "enExpediente": 22,
       "anclados": 21,
       "huecos": 0,
-      "conflictosAbiertos": 0,
+      "conflictosAbiertos": 1,
       "completitud": 1,
-      "puedeCerrar": true,
-      "firmadoPor": "R. Arias"
-    },
-    {
-      "id": "EXP-GUION",
-      "estado": "CAPTURADO",
-      "propuestos": 0,
-      "enExpediente": 0,
-      "anclados": 0,
-      "huecos": 0,
-      "conflictosAbiertos": 0,
-      "completitud": 0,
       "puedeCerrar": false,
       "firmadoPor": null
     },
