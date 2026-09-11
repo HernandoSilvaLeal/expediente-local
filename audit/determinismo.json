@@ -1,7 +1,7 @@
 {
   "_": "Dos corridas independientes del flujo completo. El diff tiene que estar vacío.",
   "_por_que": "Determinismo es una propiedad comprobable, no una promesa. Si dos corridas del mismo sistema con la misma entrada difieren, no es determinista, y da igual lo que diga el README.",
-  "fecha": "2026-09-11T07:14:37.870Z",
+  "fecha": "2026-09-11T10:36:46.184Z",
   "identicas": true,
   "corrida_1": {
     "ok": true,
