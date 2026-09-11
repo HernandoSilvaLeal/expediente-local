@@ -6,7 +6,7 @@
 **Por qué existe este archivo:** porque nadie entrega el mapa que hace su propio trabajo fácil
 de auditar, y es exactamente lo que convierte «confíe en mí» en «compruébelo usted».
 
-Regenerado: 2026-09-11T14:22:21.379Z
+Regenerado: 2026-09-11T15:17:55.788Z
 
 | Afirmación | Dónde vive | Evidencia | Comando |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Regenerado: 2026-09-11T14:22:21.379Z
 | El verificador SÍ detecta las violaciones | `pruebas/invariantes.test.mjs` | T15, once corrupciones | `npm test` |
 | De cero a funcionando en un clon limpio | `audit/clon-limpio.json` | 193 s sin caché | `ver el JSON` |
 | Dos corridas producen el mismo resultado | `audit/determinismo.json` | idénticas | `npm run audit:all` |
-| Nada de lo que descalifica está presente | `scripts/verificar-entrega.mjs` | todas PASS | `npm run verify:entrega` |
+| Nada de lo que descalifica está presente | `scripts/verificar-entrega.mjs` | REVISAR | `npm run verify:entrega` |
 | La delegación existe en 0.18.2 y no en 0.19.0 | `malla/proveedor.mjs` | clave pública en 8.419 ms | `node malla/proveedor.mjs` |
 | ⚫ Inferencia delegada entre dos máquinas | `—` | **NO MEDIDO** | `pendiente` |
 

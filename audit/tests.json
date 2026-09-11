@@ -1,6 +1,6 @@
 {
   "_": "Salida de `npm run metricas`, que ejecuta la suite de verdad y cuenta desde el código.",
-  "fecha": "2026-09-11T14:22:19.078Z",
+  "fecha": "2026-09-11T15:17:53.490Z",
   "tests": {
     "total": 392,
     "pasan": 392,

@@ -24,7 +24,7 @@
 //     marcarlo sería un falso positivo que enseña a ignorar el aviso
 
 import { readdirSync, readFileSync, statSync, existsSync, lstatSync, readlinkSync } from 'node:fs'
-import { join, relative, dirname, basename } from 'node:path'
+import { join, relative, dirname, basename, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
@@ -33,7 +33,12 @@ import { contarFrontera } from './frontera.mjs'
 import { INVARIANTES } from './verificar-invariantes.mjs'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
-const rel = (p) => relative(RAIZ, p)
+// Siempre con barras, nunca con el separador del sistema: las listas de
+// autoexclusión se escriben como 'scripts/metricas.mjs', y en Windows
+// `relative()` devuelve 'scripts\\metricas.mjs' — que no casa, así que el
+// archivo dejaba de excluirse y la puerta de jerga interna se ponía en rojo
+// señalando el propio fichero que define la lista negra.
+const rel = (p) => relative(RAIZ, p).split(sep).join('/')
 
 /** Este archivo habla de lo que busca, así que no puede buscarse a sí mismo. */
 // `metricas.mjs` se suma a los de lista-negra.mjs porque también nombra los

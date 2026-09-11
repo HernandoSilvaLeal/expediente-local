@@ -37,7 +37,7 @@
 // contador asumía la respuesta POR LA CARPETA en vez de mirar los imports.
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 
 /** Carpetas que forman «el sistema» a efectos de esta cuenta. `scripts/` queda
  *  fuera a propósito: son herramientas de verificación, no el entregable, y
@@ -65,7 +65,22 @@ export function modulosDelSistema (raiz) {
     const d = join(raiz, dir)
     if (!existsSync(d)) continue
     for (const f of readdirSync(d).sort()) {
-      if (f.endsWith('.mjs') && !AUTOEXCLUIDOS.includes(f)) modulos.push(join(dir, f))
+      // ── LA RUTA SE NORMALIZA A BARRAS, SIEMPRE ─────────────────────────
+      //
+      // `join()` usa el separador del sistema: `malla/motor.mjs` en Linux,
+      // `malla\motor.mjs` en Windows. Y más abajo se compara con
+      // `startsWith('malla/')`, que en Windows NO casa nunca.
+      //
+      // El efecto era silencioso y contaminaba tres cosas a la vez: el corte de
+      // «quién decide qué entra» daba 2 en vez de 1, el porcentaje publicado
+      // pasaba de 94,4 a 88,9, y la puerta que compara el documento con la
+      // cuenta se ponía en rojo. Cinco tests caían con ella.
+      //
+      // Lo encontró un despliegue en Windows, no la máquina de desarrollo. Es
+      // el mismo patrón de siempre: comparar texto sin normalizarlo antes.
+      if (f.endsWith('.mjs') && !AUTOEXCLUIDOS.includes(f)) {
+        modulos.push(join(dir, f).split(sep).join('/'))
+      }
     }
   }
   return modulos
