@@ -1019,3 +1019,61 @@ test('UI-52 · ⭐ el CSP PERMITE ejecutar el script de la propia página', asyn
   assert.equal(hash, real,
     'el hash del CSP no es el del script servido: el navegador bloqueará la página entera')
 })
+
+test('UI-53 · ⭐ la página EJECUTA de verdad: arranca y abre cada expediente', async () => {
+  // ── LA SUITE ESTABA VERDE Y LA PÁGINA NO ARRANCABA ───────────────────────
+  //
+  // Dos fallos tapándose el uno al otro, y ninguna de las 52 pruebas los vio:
+  //
+  //   1. el CSP bloqueaba el script (lo caza ahora UI-52)
+  //   2. `d.grupos` se leía como si fuera una lista, y `agrupar()` devuelve un
+  //      objeto — `.filter is not a function` mataba la carga entera
+  //
+  // El segundo no se podía ni observar mientras el primero existiera. Y ninguna
+  // prueba lo alcanzaba porque todas comprueban lo que el servidor DEVUELVE, no
+  // lo que el navegador HACE con ello.
+  //
+  // Esto no es un navegador, y no pretende serlo: es ejecutar el script real
+  // contra el servidor real con el DOM mínimo para que corra. Caza justo la
+  // clase de fallo que nos mordió — leer mal la forma de una respuesta.
+  const html = await (await fetch(`${BASE}/`)).text()
+  const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'))
+
+  const nodo = () => ({
+    innerHTML: '', textContent: '', value: '', dataset: {}, style: {},
+    classList: { add () {}, remove () {}, contains: () => false },
+    addEventListener () {}, setAttribute () {}, getAttribute: () => null,
+    querySelector: () => nodo(), querySelectorAll: () => [],
+    appendChild () {}, remove () {}, focus () {}, scrollIntoView () {},
+    hidden: false, disabled: false, tabIndex: 0, checked: false, className: ''
+  })
+  const doc = {
+    querySelector: () => nodo(), querySelectorAll: () => [], getElementById: () => nodo(),
+    createElement: () => nodo(), addEventListener () {}, body: nodo(), documentElement: nodo()
+  }
+  const almacen = new Map([['rol', 'oficial'], ['quien', 'Marta Him']])
+  const store = {
+    getItem: k => almacen.has(k) ? almacen.get(k) : null,
+    setItem: (k, v) => almacen.set(k, String(v)), removeItem: k => almacen.delete(k)
+  }
+  const loc = { origin: BASE, host: BASE.replace('http://', ''), href: `${BASE}/`, reload () {} }
+  class ES { constructor () { this.readyState = 0 } addEventListener () {} close () {} }
+  // Las rutas de la página son relativas; aquí necesitan el origen delante.
+  const conBase = (u, o) => fetch(typeof u === 'string' && u.startsWith('/') ? BASE + u : u, o)
+
+  const crear = (extra = '') => new Function(
+    'document', 'localStorage', 'location', 'EventSource', 'window', 'fetch',
+    'setInterval', 'setTimeout', 'clearInterval', js + extra)(
+    doc, store, loc, ES, { location: loc, localStorage: store, addEventListener () {} },
+    conBase, () => 0, () => 0, () => 0)
+
+  // 1 · el arranque completo, tal cual lo ejecuta el navegador al cargar
+  await assert.doesNotReject(async () => crear(), 'el arranque de la página lanza')
+  await new Promise(r => setTimeout(r, 600))
+
+  // 2 · y el camino que recorre una persona: abrir cada expediente
+  const abrir = crear('\nreturn abrirExpediente')
+  for (const id of ['EXP-001', 'EXP-002', 'EXP-003']) {
+    await assert.doesNotReject(() => abrir(id), `abrir ${id} lanza en la página`)
+  }
+})

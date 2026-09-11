@@ -511,7 +511,16 @@ async function cargarLista () {
   // `grupos` lo devuelve /api/expedientes desde siempre y el HTML lo ignoraba.
   // No es un dato sucio: es un hueco de debida diligencia, porque cada mitad se
   // revisa contra la mitad de la información. Merece decirse arriba del todo.
-  const duplicados = (d.grupos ?? []).filter(g => (g.miembros ?? g.ids ?? []).length > 1)
+  // ── Y SE LEE CON LA FORMA QUE DE VERDAD TIENE ───────────────────────────
+  //
+  // Esto hacía `(d.grupos ?? []).filter(...)` dando por hecho que era una lista.
+  // `agrupar()` devuelve {grupos:{clave:[ids]}, sinClave:[], conDuplicados:[]},
+  // así que `.filter` no existía y reventaba la carga entera de la página.
+  //
+  // No lo vio nadie porque el CSP bloqueaba el script antes de llegar aquí: dos
+  // fallos tapándose el uno al otro. Se leen las claves que el propio núcleo ya
+  // marcó como duplicadas, en vez de recalcularlo aquí.
+  const duplicados = d.grupos?.conDuplicados ?? []
 
   $('#lista').innerHTML =
     (duplicados.length
