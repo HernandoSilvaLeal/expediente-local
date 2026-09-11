@@ -72,6 +72,10 @@ export class ExtraccionRechazada extends Error {
  * @param {number} [opciones.plazoMs]     plazo por extracción
  * @param {number} [opciones.semilla]     seed fija: sin ella no hay reproducibilidad
  */
+/** El modelo que se pide al par cuando este equipo no tiene ninguno. Es el que
+ *  `npm run setup` descarga, así que los dos lados nombran lo mismo. */
+const MODELO_DELEGADO = 'HEALTHCARE_1_7B_MEDICAL_Q4_K_M'
+
 export function crearExtractor ({
   modelSrc,
   // ── POR QUÉ ESTO TIENE UN VALOR POR DEFECTO ────────────────────────────────
@@ -111,7 +115,22 @@ export function crearExtractor ({
   limiteCola = 16,
   predict = 700
 } = {}) {
-  if (!modelSrc) throw new Error('crearExtractor necesita modelSrc')
+  // ── DELEGAR SIN TENER EL MODELO: EL CASO QUE ESTO EXISTE PARA SERVIR ──────
+  //
+  // Esto exigía `modelSrc` de forma incondicional, ANTES de mirar si venía una
+  // clave de proveedor. O sea: un equipo sin modelo no podía delegar nunca —
+  // que es exactamente el caso de uso de la malla. La tableta de ventanilla
+  // reventaba en una validación local antes de intentar siquiera la conexión.
+  //
+  // Lo encontró un portátil sin modelo intentando pedirle inferencia a otro. No
+  // se veía en la máquina de desarrollo porque allí el modelo está siempre.
+  //
+  // Cuando se delega, `modelSrc` deja de ser una ruta en disco y pasa a ser
+  // QUÉ modelo se le pide al par. La constante del SDK sirve para eso: lleva
+  // los metadatos de motor y no exige que el fichero esté aquí.
+  if (!modelSrc && !delegate?.providerPublicKey) {
+    throw new Error('crearExtractor necesita modelSrc, o un delegate.providerPublicKey al que pedírselo')
+  }
 
   // TRAMPA · la cola del SDK tiene fondo 64 y la 65 RECHAZA. Se encola aquí,
   // muy por debajo, para que la contrapresión la note quien pide y no el modelo.
@@ -121,7 +140,16 @@ export function crearExtractor ({
   // simultáneas son dos cargas de verdad. Y es `memorizar`, no `coalescer`:
   // un modelo cargado se queda cargado (ver core/serie.mjs y T6a-M1).
   const cargar = memorizar(async () => {
-    const params = { modelSrc, modelType, modelConfig }
+    // Sin `modelSrc` local, se nombra el modelo por su constante del SDK: es
+    // el mismo que el proveedor descargó con `npm run setup`, y así los dos
+    // lados hablan del mismo artefacto sin que este equipo lo tenga en disco.
+    let fuente = modelSrc
+    if (!fuente) {
+      const sdk = await import('@qvac/sdk')
+      fuente = sdk[MODELO_DELEGADO]
+      if (!fuente) throw new Error(`el SDK no expone ${MODELO_DELEGADO}: no se puede nombrar el modelo a delegar`)
+    }
+    const params = { modelSrc: fuente, modelType, modelConfig }
 
     // TRAMPA · `delegate` va en loadModel, NO en completion. Verificado en el
     // ejemplo oficial dist/examples/delegated-inference/consumer.js.
