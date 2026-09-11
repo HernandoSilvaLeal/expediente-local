@@ -27,6 +27,7 @@ import { networkInterfaces } from 'node:os'
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, resolve, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 
 import { cargarEsquema } from '../core/esquema.mjs'
 import { abrirExpediente, aCsv, constancia } from '../core/expediente.mjs'
@@ -93,23 +94,56 @@ function avisar (que) {
   }
 }
 
+// ── EL CSP BLOQUEABA NUESTRO PROPIO SCRIPT ─────────────────────────────────
+//
+// `default-src 'self'` sin más prohíbe TODO script en línea, y la página entera
+// es uno. En un navegador de verdad no arrancaba nada: la lista se quedaba en
+// «cargando…» para siempre y en la consola salía «Executing inline script
+// violates the following Content Security Policy directive».
+//
+// Las 51 pruebas de interfaz no lo vieron porque hablan con el servidor por
+// HTTP y comprueban lo que DEVUELVE. Ninguna abre un navegador, así que ninguna
+// llega a ejecutar el CSP — que es cosa del cliente, no del servidor.
+//
+// La salida fácil era `'unsafe-inline'`, y es exactamente la equivocada: abre
+// la puerta a cualquier script inyectado en una página que presume de no cargar
+// nada de fuera.
+//
+// Lo correcto es el hash: se calcula sobre el contenido EXACTO del <script> que
+// se está sirviendo, así que vale mientras el script no cambie y deja de valer
+// en cuanto cambie. No hay nada que recordar actualizar.
+function hashDelScript (html) {
+  const i = html.indexOf('<script>')
+  if (i === -1) return null
+  const j = html.indexOf('</script>', i)
+  if (j === -1) return null
+  // El hash va sobre el texto entre las etiquetas, sin incluirlas: es lo que
+  // especifica el CSP, y una etiqueta de más da un hash que no coincide.
+  const cuerpo = html.slice(i + '<script>'.length, j)
+  return `'sha256-${createHash('sha256').update(cuerpo, 'utf8').digest('base64')}'`
+}
+
 const servidor = createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PUERTO}`)
-  const enviar = (codigo, cuerpo, tipo = 'application/json; charset=utf-8') => {
+  const enviar = (codigo, cuerpo, tipo = 'application/json; charset=utf-8', extra = '') => {
     res.writeHead(codigo, {
       'content-type': tipo,
       // Sin caché: en una demo, ver datos viejos y no saberlo es peor que esperar.
       'cache-control': 'no-store',
       // La página no carga NADA de fuera. Que se pueda comprobar en las
       // herramientas del navegador es parte del argumento del proyecto.
-      'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      'content-security-policy':
+        `default-src 'self'; script-src 'self'${extra}; ` +
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     })
     res.end(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo, null, 2))
   }
 
   try {
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      return enviar(200, readFileSync(join(AQUI, 'index.html'), 'utf8'), TIPOS['.html'])
+      const html = readFileSync(join(AQUI, 'index.html'), 'utf8')
+      const hash = hashDelScript(html)
+      return enviar(200, html, TIPOS['.html'], hash ? ` ${hash}` : '')
     }
 
     // ── EL IDENTIFICADOR, ANTES DE TOCAR EL DISCO ───────────────────────────

@@ -26,6 +26,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 
 import { FUENTE_ART18, titularArt18, operacionArt18 } from './fixtures.mjs'
 
@@ -984,4 +985,37 @@ test('UI-51 · el subrayado se puede tocar y tabular, no solo señalar con el ra
   assert.match(js, /marca\.tabIndex = 0/, 'el subrayado no recibe foco de teclado')
   assert.match(js, /key === 'Enter'/, 'no responde a Enter')
   assert.match(js, /leyenda-fuente/, 'no hay leyenda donde leerlo sin ratón')
+})
+
+test('UI-52 · ⭐ el CSP PERMITE ejecutar el script de la propia página', async () => {
+  // ── EL FALLO QUE DEJÓ LA PÁGINA MUERTA EN UN NAVEGADOR DE VERDAD ──────────
+  //
+  // El CSP era `default-src 'self'` a secas, que prohíbe TODO script en línea —
+  // y la página entera es uno. En Chrome no arrancaba nada: la lista se quedaba
+  // en «cargando…» para siempre y la consola decía «Executing inline script
+  // violates the following Content Security Policy directive».
+  //
+  // Las 51 pruebas anteriores pasaban. Todas. Porque hablan con el servidor por
+  // HTTP y comprueban lo que devuelve, y el CSP lo aplica el NAVEGADOR. Una
+  // suite verde contra un producto que no arranca es exactamente lo que este
+  // proyecto existe para no tener.
+  //
+  // Se comprueba el lazo entero: el hash que anuncia la cabecera tiene que ser
+  // el del script que va en el cuerpo. Si alguien edita `index.html` y el
+  // servidor sigue mandando un hash viejo, esto se pone rojo.
+  const r = await fetch(`${BASE}/`)
+  const csp = r.headers.get('content-security-policy') ?? ''
+  const html = await r.text()
+
+  assert.ok(!/script-src[^;]*'unsafe-inline'/.test(csp),
+    'unsafe-inline abriría la puerta a cualquier script inyectado: no es la salida')
+
+  const hash = /'sha256-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1]
+  assert.ok(hash, 'el CSP no autoriza el script de la página por hash')
+
+  const i = html.indexOf('<script>')
+  const cuerpo = html.slice(i + '<script>'.length, html.indexOf('</script>', i))
+  const real = createHash('sha256').update(cuerpo, 'utf8').digest('base64')
+  assert.equal(hash, real,
+    'el hash del CSP no es el del script servido: el navegador bloqueará la página entera')
 })
