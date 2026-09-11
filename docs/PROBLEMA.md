@@ -266,6 +266,61 @@ npm run test:frontera    # falla si el núcleo importa el SDK
 
 ---
 
+## Lo NO MEDIDO — y por qué, con la causa exacta
+
+### La delegación P2P entre dos máquinas físicas: **intentada, no lograda**
+
+Se probó el 11 de septiembre de 2026 con dos portátiles Windows en la misma red:
+un Dell Latitude 3410 como proveedor —con el modelo descargado— y un Acer
+Aspire A314 como consumidor, con `~/.qvac/models` **vacío, verificado tres
+veces antes y después de cada intento**.
+
+**No llegó a conectar, y no fue por la red.** El proceso worker del SDK aborta
+al arrancar:
+
+```
+AddonError: CANNOT_LOAD: Cannot load addon
+  @qvac/llm-llamacpp/prebuilds/win32-x64/qvac__llm-llamacpp.bare
+[cause]: Error: The specified procedure could not be found.
+```
+
+**El worker intenta cargar el motor de inferencia LOCAL aunque el plan sea
+delegar todo al par.** Se comprobó con `fallbackToLocal: true` y con `false`: el
+error es idéntico byte a byte, así que no es que el addon se cargue «por si
+acaso» cuando el respaldo está activo — se carga incondicionalmente.
+
+Se descartó que faltara el Visual C++ Redistributable (está instalado). El
+binario del runtime es válido y corre solo.
+
+**Consecuencia, dicha sin suavizar:** mientras el worker necesite ese addon
+disponible solo para *hablarle* a un par, **la delegación pura no es posible en
+hardware donde ese addon no carga**. Cargarlo de forma perezosa —solo si el
+respaldo local se activa de verdad— lo resolvería.
+
+Es una limitación del SDK `@qvac/sdk@0.18.2` en ese Windows concreto, no de este
+proyecto. Y se publica aquí porque un límite encontrado y declarado vale más que
+uno que nadie buscó.
+
+### Lo que sí quedó demostrado en ese mismo laboratorio
+
+> *«Este equipo corre el sistema entero —captura, guardias, registro encadenado
+> y aprobación con firma humana— sin modelo, sin GPU y sin internet. Todo el
+> núcleo es determinista.»*
+
+Verificado en el Acer, con la carpeta de modelos vacía.
+
+### Y tres fallos propios que ese laboratorio destapó
+
+Ninguno se veía en la máquina de desarrollo:
+
+| Qué | Por qué no se veía |
+|---|---|
+| el plazo de inferencia asumía GPU dedicada | la máquina de desarrollo tiene GPU |
+| las rutas se comparaban con `/` y Windows usa `\` | rompía el contador y tres puertas |
+| **un equipo sin modelo no podía delegar** | imposible por construcción; allí el modelo está siempre |
+
+---
+
 ## Lo que este proyecto NO resuelve
 
 Se dice aquí, y no en letra pequeña:
