@@ -91,8 +91,22 @@ export function crearExtractor ({
   modelType = 'llamacpp-completion',
   delegate = null,
   modelConfig = { ctx_size: 4096 },
-  plazoMs = 30_000,
-  plazoCargaMs = 90_000,
+  // ── EL PLAZO ASUMÍA UNA GPU, Y EL PROYECTO PRESUME DE CORRER EN CPU ───────
+  //
+  // 30 s bastan en la torre, que tiene GPU dedicada. En un portátil de
+  // sucursal con gráficos integrados —un Dell Latitude 3410 con Intel UHD, que
+  // es exactamente el hardware que este proyecto dice soportar— la inferencia
+  // no llega a responder y el CLI aborta antes de que el modelo proponga NADA.
+  //
+  // El diagnóstico era engañoso: parecía que el modelo fallaba, cuando lo que
+  // fallaba era nuestra prisa. Y afecta también a la malla: el proveedor infiere
+  // en su propia máquina, así que un plazo corto aquí rompe el P2P entero.
+  //
+  // 180 s no es «por si acaso»: es lo que tarda un 1.7B cuantizado en CPU
+  // integrada. Quien tenga GPU no lo nota, porque el plazo solo se agota cuando
+  // de verdad hace falta. Y `--plazo` lo deja ajustar sin tocar código.
+  plazoMs = 180_000,
+  plazoCargaMs = 180_000,
   semilla = 42,
   limiteCola = 16,
   predict = 700

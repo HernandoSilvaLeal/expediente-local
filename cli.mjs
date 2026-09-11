@@ -17,7 +17,7 @@
 // Si el import fuese estático, nada de esto arrancaría sin 4,8 GB de modelo.
 //
 // Uso:
-//   node cli.mjs capturar  --texto "..." [--modelo <ruta>] [--proveedor <clave>]
+//   node cli.mjs capturar  --texto "..." [--modelo <ruta>] [--proveedor <clave>] [--plazo <segundos>]
 //   node cli.mjs revisar   --texto "..." --extraccion salida-del-modelo.json
 //   node cli.mjs ver | csv | constancia | verificar | hechos
 //   node cli.mjs aprobar --oficial "..." --texto "..."  |  rechazar --oficial "..."
@@ -201,7 +201,11 @@ async function capturar () {
     // es justo lo que pasó: el artículo 18 subió los campos críticos de 2 a 19.
     // Así que se calcula: cada campo cuesta su valor más su cita, y una cita es
     // una frase del documento. ~110 tokens por campo, con suelo generoso.
-    predict: op.predict ? Number(op.predict) : Math.max(700, esquema.camposCriticos.length * 110)
+    predict: op.predict ? Number(op.predict) : Math.max(700, esquema.camposCriticos.length * 110),
+    // `--plazo` en segundos, porque quien lo necesita está mirando un reloj de
+    // pared, no contando milisegundos. Sin él se usa el valor por defecto, que
+    // ya contempla un portátil sin GPU dedicada.
+    ...(op.plazo ? { plazoMs: Number(op.plazo) * 1000, plazoCargaMs: Number(op.plazo) * 1000 } : {})
   })
 
   try {
